@@ -226,7 +226,7 @@ int isPort(char port[])
   val = atoi(port);
   // verificar se porto está dentro dos limites permitidos, se sim 
   // retornar 1, se não retornar 0 e imprimir mensagem de erro
-  if(checkDigit(port) && val >= 1025 && val <= 65536)
+  if(isdigit(port) && val >= 1025 && val <= 65536)
     return 1;	
   printf("Error the inserted port must be inside the valid range\n");
   return 0;
