@@ -42,3 +42,10 @@ typedef struct internals{
 	struct viz *this;
 	struct viz *next;
 }internals;
+
+int main(int argc, char *argv[])
+{
+	
+	
+}
+
