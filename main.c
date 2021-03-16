@@ -25,16 +25,16 @@ typedef struct no{
 	object *conj_objects; //conjunto de objetos nomeados contidos num nó
 	int id;    //identificador do nó
 	char node_IP[INET_ADDRSTRLEN]; //endereço IP do nó
-    char node_port[NI_MAXSERV]; //Porto TCP do nó
-    struct viz *externo; //Ponteiro para vizinho externo
-    struct viz *backup; //Ponteiro para nó de recuperação
+    	char node_port[NI_MAXSERV]; //Porto TCP do nó
+    	struct viz *externo; //Ponteiro para vizinho externo
+    	struct viz *backup; //Ponteiro para vizinho de recuperação
 }no;
 
 typedef struct viz{
 	int fd; //file descriptor 
 	int id;    //identificador do vizinho
 	char viz_IP[INET_ADDRSTRLEN]; //endereço IP do vizinho
-    char viz_port[NI_MAXSERV]; //Porto TCP do vizinho
+    	char viz_port[NI_MAXSERV]; //Porto TCP do vizinho
 }viz;
 
 //lista dos vizinhos internos do nó
