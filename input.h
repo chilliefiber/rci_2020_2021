@@ -16,6 +16,8 @@ char *readCommand(enum instr *instr_code);
 
 int checkDigit(char word[]);
 
+int isIP(char ip[]); 
+
 int isPort(char port[]);
 
 void* safeMalloc(size_t size);
