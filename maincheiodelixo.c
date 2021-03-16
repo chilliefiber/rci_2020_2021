@@ -49,6 +49,17 @@ int main(int argc, char *argv[])
     struct addrinfo hints, *res;
     struct sockaddr_in addr; 
     struct sigaction act;
+    socklen_t addrlen;
+	
+    memset(&act, 0, sizeof act);
+    act.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &act, NULL) == -1) exit(1);
+	
+    if(argc != 5 || isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
+    {
+	printf("Wrong format, please run with ./ndn IP TCP regIP regUDP\n");
+	exit(1);
+    }
 
     return 0;
 }
