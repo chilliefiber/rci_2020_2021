@@ -50,7 +50,7 @@ char *readCommand(enum instr *instr_code)
 	{
 		if(size_input == 3)
 		{
-			if(checkDigit(second) == 1 && checkDigit(id) == 1)
+			if(isdigit(second) == 1 && isdigit(id) == 1)
 			{
 				*instr_code = JOIN_ID;
 				
@@ -59,7 +59,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else if(size_input == 5)
 		{
-			if(checkDigit(second) == 1 && checkDigit(id) == 1 && isIP(bootIP) == 1 && isPort(bootTCP) == 1)
+			if(isdigit(second) == 1 && isdigit(id) == 1 && isIP(bootIP) == 1 && isPort(bootTCP) == 1)
 			{
 				*instr_code = JOIN_LINK;
 				return getParam(terminal);
@@ -167,21 +167,20 @@ char *readCommand(enum instr *instr_code)
 		return NULL;
 }
 
-int checkDigit(char word[])
+int validate_number(char *str) 
 {
-  int i = 0;
-	
-  // verificar se todos os caracteres de uma string não números entre 0 e 9
-  // se sim retornar 1, se não retornar 0 e imprimir mensagem de erro
-  for(i=0; i<strlen(word); i++)
-	if(word[i] < '0' || word[i] > '9'){
-          printf("Error every char must be a positive number\n");
-	  return 0;
-        }
-  return 1;
+   while (*str) 
+   {
+      if(!isdigit(*str)){ //if the character is not a number, return
+         false
+         return 0;
+      }
+      str++; //point to next character
+   }
+   return 1;
 }
 
-int isIP(char ip[]) 
+int isIP(char *ip) 
 { 
    int num, dots = 0;
    char *ptr;
@@ -195,7 +194,7 @@ int isIP(char ip[])
    
    while (ptr) 
    {
-      if (!checkDigit(ptr)) //check whether the sub string is holding a number or not
+      if (!validate_number(ptr)) //check whether the sub string is holding a number or not
       {   
          return 0;
       }  
