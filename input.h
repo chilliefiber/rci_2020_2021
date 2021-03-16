@@ -14,9 +14,9 @@ char* getParam(char *input);
 
 char *readCommand(enum instr *instr_code);
 
-int checkDigit(char word[]);
+int validate_number(char *str);
 
-int isIP(char ip[]); 
+int isIP(char *ip); 
 
 int isPort(char port[]);
 
