@@ -159,10 +159,12 @@ char *readCommand(enum instr *instr_code)
 			return NULL;
 		}
 	}
-	
-	if(*instr_code == ERR)
+	else
 	{
-		printf("Error in command input!\n");
+		if(*instr_code == ERR)
+		{
+			printf("Error in command input!\n");
+		}
 	}
 		return NULL;
 }
