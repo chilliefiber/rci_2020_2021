@@ -51,6 +51,10 @@ typedef struct internals{
 
 int main(int argc, char *argv[])
 {
+	fd_set rfds;
+	int fd_tcp, fd_udp, maxfd, counter;
+	struct addrinfo hints, *res;
+  	struct sockaddr_in addr;
 	enum instr instr_code;
 	char *user_input;
 	cache_objects cache[N];
@@ -67,11 +71,73 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	
+	helpMenu();
+	user_input = readCommand(&instr_code);
+	
 	while(1)
 	{
-		helpMenu();
-	
-		user_input = readCommand(&instr_code); 
+		/*initialize file descriptor set*/
+		FD_ZERO(&rfds);
+		
+		FD_SET(fd_tcp, &rfds);
+    
+		FD_SET(fd_udp, &rfds);
+		
+    		FD_SET(STDIN_FILENO, &rfds);
+    
+		max_fd=max(fd_tcp, fd_udp);
+    		max_fd=max(max_fd, STDIN_FILENO);
+		
+		 /* read TCP from an internal neighbour */
+        	if (interno_on) 
+		{
+            	  FD_SET(fd_tcp_i, &rfds);
+            	  maxfd = max(maxfd, fd_tcp);
+        	}
+        
+        	/* read TCP from external neighbour */
+        	if (externo_on) 
+		{
+            	  FD_SET(fd_tcp_e, &rfds);
+                  maxfd = max(maxfd, fd_tcp_e);
+                }
+		
+		/* select upon which file descriptor to act */
+        	counter = select(maxfd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
+        	if(counter<=0)  exit(1);
+		
+		
+		// canal onde o próprio nó recebe chamadas TCP
+		if (FD_ISSET(fd_tcp, &rfds))
+		{
+			
+		}
+		
+		// UDP
+		if (FD_ISSET(fd_udp, &rfds))
+		{
+			
+		}
+		
+		 // Ler input do utilizador no terminal
+    		if (FD_ISSET(STDIN_FILENO, &rfds))
+		{
+		   user_input = readCommand(&instr_code);
+			
+			
+		}
+		
+		// Ler dum vizinho interno
+		if (interno_on)
+		{
+		
+		}
+		
+		// Ler do vizinho externo 
+		if (externo_on)
+		{
+		
+		}
 	}	
 	
 	return 0;
