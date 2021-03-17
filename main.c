@@ -126,6 +126,12 @@ int main(int argc, char *argv[])
 			
 		}
 		
+		/* here we'll accept a request to connect */
+        	if (FD_ISSET(fd_tcp, &rfds)) 
+		{
+            		
+		}
+		
 		// Ler dum vizinho interno
 		if (interno_on)
 		{
