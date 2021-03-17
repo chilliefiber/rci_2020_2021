@@ -16,6 +16,8 @@
 #define max(A,B) ((A)>=(B)?(A):(B))
 #define STRING_SIZE 100
 
+#define N 2 //capacidade da cache de objetos do nó
+
 typedef struct object{
 		char subname[STRING_SIZE];
 		int id_obj;
