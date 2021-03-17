@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 	act.sa_handler = SIG_IGN;
 	if(sigaction(SIGPIPE, &act, NULL) == -1) exit(1);
 	
-	if(argc != 5 || isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
+	if(argc != 5 || isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || strcmp("193.136.138.142", argv[3]) != 0 || strcmp("59000", argv[4]) != 0))
 	{
 		printf("Usage: ./ndn IP TCP regIP regUDP\n");
 		exit(1);
