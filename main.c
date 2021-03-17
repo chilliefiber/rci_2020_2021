@@ -62,6 +62,7 @@ int main(int argc, char *argv[])
 {
 	fd_set rfds;
 	int fd_udp, maxfd, counter;
+	int errcode_udp;
 	struct addrinfo hints, *res;
   	struct sockaddr_in addr;
 	enum instr instr_code;
@@ -79,6 +80,30 @@ int main(int argc, char *argv[])
 		printf("Usage: ./ndn IP TCP regIP regUDP\n");
 		exit(1);
 	}
+	
+	if ((fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) == -1) exit(1);
+
+        memset(&hints, 0, sizeof hints);
+        hints.ai_family=AF_INET;
+        hints.ai_socktype=SOCK_DGRAM;
+        hints.ai_flags=AI_PASSIVE;
+	
+	errcode_udp = getaddrinfo(NULL,argv[4],&hints,&res);
+    	if(errcode_udp!=0)  
+	{
+	   printf("Error getting address information for UDP server socket\n");
+	   exit(1);
+	}
+		
+    
+    	if(bind(fd_udp,res->ai_addr, res->ai_addrlen) == -1)
+	{
+	   printf("Error binding to UDP server socket\n");
+           freeaddrinfo(res);	
+	}
+	
+	freeaddrinfo(res);
+	
 	
 	helpMenu();
 	
