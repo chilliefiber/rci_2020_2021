@@ -50,7 +50,7 @@ char *readCommand(enum instr *instr_code)
 	{
 		if(size_input == 3)
 		{
-			if(isdigit(second) == 1 && isdigit(id) == 1)
+			if(checkDigit(second) == 1 && checkDigit(id) == 1)
 			{
 				*instr_code = JOIN_ID;
 				
@@ -59,7 +59,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else if(size_input == 5)
 		{
-			if(isdigit(second) == 1 && isdigit(id) == 1 && isIP(bootIP) == 1 && isPort(bootTCP) == 1)
+			if(checkDigit(second) == 1 && checkDigit(id) == 1 && isIP(bootIP) == 1 && isPort(bootTCP) == 1)
 			{
 				*instr_code = JOIN_LINK;
 				return getParam(terminal);
@@ -113,7 +113,7 @@ char *readCommand(enum instr *instr_code)
 	}
 	else if((strcmp("show",command) == 0 && strcmp("routing",second) == 0) || strcmp("sr",command) == 0)
 	{
-		if((size_input == 1 && strcmp("st",command) == 0) || (size_input == 2 && strcmp("show",command) == 0 && strcmp("routing",second) == 0))
+		if((size_input == 1 && strcmp("sr",command) == 0) || (size_input == 2 && strcmp("show",command) == 0 && strcmp("routing",second) == 0))
 		{
 			*instr_code = SR;
 		}
@@ -167,56 +167,30 @@ char *readCommand(enum instr *instr_code)
 		return NULL;
 }
 
-int validate_number(char *str) 
+int checkDigit(char word[])
 {
-   while (*str) 
-   {
-      if(!isdigit(*str)){ //if the character is not a number, return
-         false
-         return 0;
-      }
-      str++; //point to next character
-   }
-   return 1;
+  int i = 0;
+	
+  // verificar se todos os caracteres de uma string não números entre 0 e 9
+  // se sim retornar 1, se não retornar 0 e imprimir mensagem de erro
+  for(i=0; i<strlen(word); i++)
+	if(word[i] < '0' || word[i] > '9'){
+          printf("Error every char must be a positive number\n");
+	  return 0;
+        }
+  return 1;
 }
 
-int isIP(char *ip) 
-{ 
-   int num, dots = 0;
-   char *ptr;
-   
-   if (ip == NULL)
-   return 0;
-      
-   ptr = strtok(ip, "."); //cut the string using dor delimiter
-   if (ptr == NULL)
-   return 0;
-   
-   while (ptr) 
-   {
-      if (!validate_number(ptr)) //check whether the sub string is holding a number or not
-      {   
-         return 0;
-      }  
-         num = atoi(ptr); //convert substring to number
-         
-      if (num >= 0 && num <= 255) 
-      {
-         ptr = strtok(NULL, "."); //cut the next part of the string
-         if (ptr != NULL)
-         dots++; //increase the dot count
-      } 
-      else
-      {
-           return 0;
-	  }
-   }
-    
-   if (dots != 3) //if the number of dots are not 3, return false
-   {   
-       return 0;
-   }
-      return 1;
+int isIP(char ip[])
+{
+	unsigned long addr_ip = 0;
+	
+	if(inet_pton(AF_INET, ip, &addr_ip) == 0)
+	{
+		printf("Invalid IPv4 address!\n");
+		return 0 ;
+	}
+	return 1;
 }
 
 int isPort(char port[])
@@ -226,7 +200,7 @@ int isPort(char port[])
   val = atoi(port);
   // verificar se porto está dentro dos limites permitidos, se sim 
   // retornar 1, se não retornar 0 e imprimir mensagem de erro
-  if(isdigit(port) && val >= 1025 && val <= 65536)
+  if(checkDigit(port) && val >= 1025 && val <= 65536)
     return 1;	
   printf("Error the inserted port must be inside the valid range\n");
   return 0;
