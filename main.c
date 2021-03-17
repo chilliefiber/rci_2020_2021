@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 {
 	enum instr instr_code;
 	char *user_input;
-	cache_objects cache[2];
+	cache_objects cache[N];
 	
 	struct sigaction act;
 	/* Protection against SIGPIPE signals */ 
