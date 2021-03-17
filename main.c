@@ -21,6 +21,10 @@ typedef struct object{
 		int id_obj;
 }object;
 
+typedef struct cache_objects{
+		object obj;
+}cache_objects;
+
 typedef struct no{
 	object *conj_objects; //conjunto de objetos nomeados contidos num nó
 	int id;    //identificador do nó
@@ -47,6 +51,7 @@ int main(int argc, char *argv[])
 {
 	enum instr instr_code;
 	char *user_input;
+	cache_objects cache[2];
 	
 	struct sigaction act;
 	/* Protection against SIGPIPE signals */ 
