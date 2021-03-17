@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 	cache_objects cache[N];
 	
 	struct sigaction act;
-	/* Protection against SIGPIPE signals */ 
+	// Protection against SIGPIPE signals 
 	memset(&act, 0, sizeof act);
 	act.sa_handler = SIG_IGN;
 	if(sigaction(SIGPIPE, &act, NULL) == -1) exit(1);
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 	
 	while(1)
 	{
-		/*initialize file descriptor set*/
+		// initialize file descriptor set
 		FD_ZERO(&rfds);
     
 		FD_SET(fd_udp, &rfds);
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 		
 		
 		
-		/* select upon which file descriptor to act */
+		// select upon which file descriptor to act 
         	counter = select(maxfd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         	if(counter<=0)  exit(1);
 		
