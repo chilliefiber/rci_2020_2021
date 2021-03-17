@@ -45,6 +45,8 @@ typedef struct internals{
 
 int main(int argc, char *argv[])
 {
+	enum instr instr_code;
+	char *user_input;
 	
 	struct sigaction act;
 	/* Protection against SIGPIPE signals */ 
