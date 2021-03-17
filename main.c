@@ -50,6 +50,14 @@ typedef struct internals{
 	struct viz *next;
 }internals;
 
+
+// enum dos vários estados associados à rede de nós
+// EMPTY no caso em que não existem nós
+// ONENODE no caso em que a rede tem um só nó,
+// TWONODES no caso em que a rede tem dois nós
+// MANYNODES no caso em que a rede tem mais que dois nós
+enum state {EMPTY, ONENODE, TWONODES, MANYNODES};
+
 int main(int argc, char *argv[])
 {
 	fd_set rfds;
