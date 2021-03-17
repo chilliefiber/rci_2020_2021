@@ -142,19 +142,19 @@ int main(int argc, char *argv[])
 		}
 		
 		// Ler dum vizinho interno
-		if (interno_on)
+		if (FD_ISSET(fd_tcp_i, &rfds)) 
 		{
 		
 		}
 		
 		/* if there's a new link it's handled here, then if need be they're assigned to extern or intern*/
-		if (new_com)
+		if (FD_ISSET(newfd, &rfds)) 
 		{
 			
 		}
 		
 		// Ler do vizinho externo 
-		if (externo_on)
+		if (FD_ISSET(fd_tcp_e, &rfds)) 
 		{
 		
 		}
