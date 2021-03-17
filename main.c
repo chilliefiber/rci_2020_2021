@@ -93,8 +93,7 @@ int main(int argc, char *argv[])
 	{
 	   printf("Error getting address information for UDP server socket\n");
 	   exit(1);
-	}
-		
+	}	
     
     	if(bind(fd_udp,res->ai_addr, res->ai_addrlen) == -1)
 	{
@@ -136,8 +135,7 @@ int main(int argc, char *argv[])
     		if (FD_ISSET(STDIN_FILENO, &rfds))
 		{
 		   user_input = readCommand(&instr_code);
-			
-			
+			 
 			
 		   free(user_input);
 		}
