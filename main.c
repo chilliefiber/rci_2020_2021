@@ -104,6 +104,8 @@ int main(int argc, char *argv[])
 		   user_input = readCommand(&instr_code);
 			
 			
+			
+		   free(user_input);
 		}
 		
 		
