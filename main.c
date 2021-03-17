@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
         	if (interno_on) 
 		{
             	  FD_SET(fd_tcp_i, &rfds);
-            	  maxfd = max(maxfd, fd_tcp);
+            	  maxfd = max(maxfd, fd_tcp_i);
         	}
         
         	/* read TCP from external neighbour */
