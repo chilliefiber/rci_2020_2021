@@ -101,6 +101,13 @@ int main(int argc, char *argv[])
                   maxfd = max(maxfd, fd_tcp_e);
                 }
 		
+		/* read TCP from new communication */
+        	if (new_com) 
+		{
+            	   FD_SET(newfd, &rfds);
+            	   maxfd = max(maxfd, newfd);
+        	}
+		
 		/* select upon which file descriptor to act */
         	counter = select(maxfd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         	if(counter<=0)  exit(1);
@@ -129,13 +136,21 @@ int main(int argc, char *argv[])
 		/* here we'll accept a request to connect */
         	if (FD_ISSET(fd_tcp, &rfds)) 
 		{
-            		
+            	   newfd = accept(fd_tcp, (struct sockaddr*)&addr_tcp, &addrlen_tcp);
+            	   if(newfd==-1) exit(1);
+            	   new_com = 1;	
 		}
 		
 		// Ler dum vizinho interno
 		if (interno_on)
 		{
 		
+		}
+		
+		/* if there's a new link it's handled here, then if need be they're assigned to extern or intern*/
+		if (new_com)
+		{
+			
 		}
 		
 		// Ler do vizinho externo 
