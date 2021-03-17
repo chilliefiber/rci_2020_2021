@@ -28,6 +28,7 @@ typedef struct cache_objects{
 }cache_objects;
 
 typedef struct no{
+	int net; //identificador da rede
 	object *conj_objects; //conjunto de objetos nomeados contidos num nó
 	int id;    //identificador do nó
 	char node_IP[INET_ADDRSTRLEN]; //endereço IP do nó
