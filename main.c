@@ -72,7 +72,6 @@ int main(int argc, char *argv[])
 	}
 	
 	helpMenu();
-	user_input = readCommand(&instr_code);
 	
 	while(1)
 	{
