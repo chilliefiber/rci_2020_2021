@@ -46,6 +46,25 @@ typedef struct internals{
 int main(int argc, char *argv[])
 {
 	
+	struct sigaction act;
+	/* Protection against SIGPIPE signals */ 
+	memset(&act, 0, sizeof act);
+	act.sa_handler = SIG_IGN;
+	if(sigaction(SIGPIPE, &act, NULL) == -1) exit(1);
 	
+	if(argc != 5 || isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
+	{
+		printf("Usage: ./ndn IP TCP regIP regUDP\n");
+		exit(1);
+	}
+	
+	while(1)
+	{
+		helpMenu();
+	
+		user_input = readCommand(&instr_code); 
+	}	
+	
+	return 0;
 }
 
