@@ -65,8 +65,8 @@ list_objects *createinsertObject(list_objects *head, char *subname)
 {
     list_objects *tmp = head;
     list_objects *new_obj = safeMalloc(sizeof(list_objects));
-    new_obj->object = safeMalloc(strlen(subname)+1);
-    strcpy(new_obj->object, subname);
+    new_obj->objct = safeMalloc(strlen(subname)+1);
+    strcpy(new_obj->objct, subname);
 
     if(head == NULL)
     {
