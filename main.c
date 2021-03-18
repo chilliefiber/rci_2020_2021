@@ -138,11 +138,10 @@ void parseLine(node_list **list, char *line)
     }
 }
 // enum dos vários estados associados à rede de nós
-// EMPTY no caso em que não existem nós
-// ONENODE no caso em que a rede tem um só nó,
+// NONODES no caso em que não existem nós
 // TWONODES no caso em que a rede tem dois nós
 // MANYNODES no caso em que a rede tem mais que dois nós
-enum state {EMPTY, ONENODE, TWONODES, MANYNODES};
+enum state {NONODES, TWONODES, MANYNODES};
 
 int main(int argc, char *argv[])
 {
@@ -304,7 +303,7 @@ int main(int argc, char *argv[])
     		if (FD_ISSET(STDIN_FILENO, &rfds))
 		{
 		    user_input = readCommand(&instr_code);
-		    if (instr_code == JOIN_ID && _state == EMPTY)
+		    if (instr_code == JOIN_ID && state == NONODES)
 		    {
 			if(sscanf(user_input,"%d %d",&self.net,&self.id) != 2)
 			{
@@ -316,10 +315,10 @@ int main(int argc, char *argv[])
 			str_id = safeMalloc(sizeof(self.id)+1);
 			sprintf(str_id,"%d.",self.id);
 			    
-			_state = ONENODE;
+			_state = TWONODES;
                     }
 		    
-		    if (instr_code == CREATE && _state != EMPTY)
+		    if (instr_code == CREATE && _state != NONODES)
 		    {
 			    
 		    	head = createinsertObject(head,user_input,str_id);
