@@ -56,19 +56,44 @@ char *readCommand(enum instr *instr_code)
 				
 				return getParam(terminal);
 			}
+			if(checkDigit(second) != 1)
+			{
+				printf("Invalid net! Must be a digit!\n");
+			}
+			if(checkDigit(id) != 1)
+			{
+				printf("Invalid id! Must be a digit!\n");
+			}
+			
 		}
 		else if(size_input == 5)
 		{
 			if(checkDigit(second) == 1 && checkDigit(id) == 1 && isIP(bootIP) == 1 && isPort(bootTCP) == 1)
 			{
 				*instr_code = JOIN_LINK;
+				
 				return getParam(terminal);
+			}
+			if(checkDigit(second) != 1)
+			{
+				printf("Invalid net! Must be a digit!\n");
+			}
+			if(checkDigit(id) != 1)
+			{
+				printf("Invalid id! Must be a digit!\n");
+			}
+			if(isIP(bootIP) != 1)
+			{
+				printf("Invalid IPv4 address!\n");
+			}
+			if(isPort(bootTCP) != 1)
+			{
+				printf("Invalid Port!\n");
 			}
 		}
 		else
 		{
 			printf("Wrong format! Commands: join net id, join net id bootIP bootTCP\n");
-			return NULL;
 		}	
 	}
 	else if(strcmp("create",command) == 0)
@@ -82,21 +107,26 @@ char *readCommand(enum instr *instr_code)
 		else
 		{
 			printf("Wrong format! Command: create subname\n");
-			return NULL;
 		}
 	}
 	else if(strcmp("get",command) == 0)
 	{
 		if(size_input == 2)
 		{
-			*instr_code = GET;
+			if(isName(second) == 1)
+			{
+				*instr_code = GET;
 				
-			return getParam(terminal);
+				return getParam(terminal);
+			}
+			else
+			{
+				printf("Invalid name! Format must be: id.subname\n");
+			}
 		}
 		else
 		{
 			printf("Wrong format! Command: get name\n");
-			return NULL;
 		}
 	}
 	else if((strcmp("show",command) == 0 && strcmp("topology",second) == 0) || strcmp("st",command) == 0)
@@ -108,7 +138,6 @@ char *readCommand(enum instr *instr_code)
 		else
 		{
 			printf("Wrong format in command! Command: show topology or st\n");
-			return NULL;
 		}
 	}
 	else if((strcmp("show",command) == 0 && strcmp("routing",second) == 0) || strcmp("sr",command) == 0)
@@ -120,7 +149,6 @@ char *readCommand(enum instr *instr_code)
 		else
 		{
 			printf("Wrong format in command! Command: show routing or sr\n");
-			return NULL;
 		}
 	}
 	else if((strcmp("show",command) == 0 && strcmp("cache",second) == 0) || strcmp("sc",command) == 0)
@@ -132,7 +160,6 @@ char *readCommand(enum instr *instr_code)
 		else
 		{
 			printf("Wrong format in command! Command: show cache or sc\n");
-			return NULL;
 		}
 	}
 	else if(strcmp("leave",command) == 0)
@@ -144,7 +171,6 @@ char *readCommand(enum instr *instr_code)
 		else
 		{
 			printf("Wrong format in command! Command: leave\n");
-			return NULL;
 		}
 	}
 	else if(strcmp("exit",command) == 0)
@@ -156,7 +182,6 @@ char *readCommand(enum instr *instr_code)
 		else
 		{
 			printf("Wrong format in command! Command: exit\n");
-			return NULL;
 		}
 	}
 	else
@@ -177,7 +202,7 @@ int checkDigit(char word[])
   // se sim retornar 1, se não retornar 0 e imprimir mensagem de erro
   for(i=0; i<strlen(word); i++)
 	if(word[i] < '0' || word[i] > '9'){
-          printf("Error every char must be a positive number\n");
+
 	  return 0;
         }
   return 1;
@@ -189,7 +214,6 @@ int isIP(char ip[])
 	
 	if(inet_pton(AF_INET, ip, &addr_ip) == 0)
 	{
-		printf("Invalid IPv4 address!\n");
 		return 0 ;
 	}
 	return 1;
@@ -204,8 +228,22 @@ int isPort(char port[])
   // retornar 1, se não retornar 0 e imprimir mensagem de erro
   if(checkDigit(port) && val >= 1025 && val <= 65536)
     return 1;	
-  printf("Error the inserted port must be inside the valid range\n");
+
   return 0;
+}
+
+int isName(char name[])
+{
+	char *token;
+	
+	token = strtok(name,".");
+	
+	if(checkDigit(token) == 1)
+	{
+		return 1;
+	}
+
+	return 0;
 }
 
 void* safeMalloc(size_t size)
