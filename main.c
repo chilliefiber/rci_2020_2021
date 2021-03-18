@@ -61,12 +61,14 @@ typedef struct list_objects{
 	struct list_objects *next;
 }list_objects;
 
-list_objects *createinsertObject(list_objects *head, char *subname)
+list_objects *createinsertObject(list_objects *head, char *subname, char *str_id)
 {
     list_objects *tmp = head;
     list_objects *new_obj = safeMalloc(sizeof(list_objects));
-    new_obj->objct = safeMalloc(strlen(subname)+1);
-    strcpy(new_obj->objct, subname);
+    new_obj->objct = safeMalloc(strlen(str_id)+strlen(subname)+1);
+	
+    strcpy(new_obj->objct, str_id);
+    strcat(new_obj->objct, subname);
 
     if(head == NULL)
     {
@@ -157,6 +159,7 @@ int main(int argc, char *argv[])
         no self;
 	
 	list_objects *head = NULL;
+	char *str_id;
 	
 	struct sigaction act;
 	// Protection against SIGPIPE signals 
@@ -308,7 +311,10 @@ int main(int argc, char *argv[])
 		    
 		    if (instr_code == CREATE && _state != EMPTY)
 		    {
-		    	head = createinsertObject(head,user_input);
+			str_id = safeMalloc(sizeof(self.id)+1);
+			sprintf(str_id,"%d.",self.id);
+			    
+		    	head = createinsertObject(head,user_input,str_id);
 		    }
 			
 		    free(user_input);
