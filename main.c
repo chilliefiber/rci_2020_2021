@@ -50,7 +50,60 @@ typedef struct internals{
 	struct viz *next;
 }internals;
 
+typedef struct node_list{
+    char node_IP[INET_ADDRSTRLEN]; //endereço IP do nó	
+    char node_port[NI_MAXSERV]; //Porto TCP do nó
+    struct node_list *next;
+} node_list;
 
+node_list *parseNodelist(char* datagram, int *num_nodes)
+{
+    int datagram_ix = 0, line_ix=0;
+    node_list* list = NULL;
+    *num_nodes = -1;
+    char c = datagram[datagram_ix];
+    char line[150]; // colocar aqui uma variavel com #DEFINE 150
+    while (c != '\0')
+    {
+        if (c == '\n'){
+            (*num_nodes)++;
+            // neste caso ou é zero, e portanto lemos apenas o comando
+            // ou devemos fazer um elemento da lista de nós
+            if (*num_nodes)
+            {   
+                line[line_ix] = '\0';
+                parseLine(&list, line);
+                line_ix = 0; // reiniciar o indice, porque vamos começar a ler uma linha nova
+
+            }
+        }
+        // quando num_nodes == -1 estamos a ler o comando e nao um part IP/porto
+        else if (*num_nodes != -1)
+        {
+            line[line_ix] = c;
+            line_ix++;
+        }
+        datagram_ix++;
+        c = datagram[datagram_ix];
+    }
+    return list;
+}
+
+parseLine(node_list **list, char *line)
+    node_list *this = safeMalloc(sizeof(node_list));
+    this.next = NULL;
+    node_list *aux = *list;
+    sscanf("%s %s", this.node_IP, this.node_port);
+    if (*list == NULL)
+        *list = this;
+    else
+    {
+        // go to last element of list
+        for (aux; aux->next != NULL; aux = aux->next);
+        // place newly created element in list
+        aux->next = this;
+    }
+ 
 // enum dos vários estados associados à rede de nós
 // EMPTY no caso em que não existem nós
 // ONENODE no caso em que a rede tem um só nó,
@@ -68,6 +121,9 @@ int main(int argc, char *argv[])
 	enum instr instr_code;
 	char *user_input;
 	cache_objects cache[N];
+        enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
+        socklen_t addrlen;
+        no self;
 	
 	struct sigaction act;
 	// Protection against SIGPIPE signals 
@@ -86,20 +142,13 @@ int main(int argc, char *argv[])
         memset(&hints, 0, sizeof hints);
         hints.ai_family=AF_INET;
         hints.ai_socktype=SOCK_DGRAM;
-        hints.ai_flags=AI_PASSIVE;
 	
-	errcode_udp = getaddrinfo(NULL,argv[4],&hints,&res);
+	errcode_udp = getaddrinfo(argv[3],argv[4],&hints,&res);
     	if(errcode_udp!=0)  
 	{
 	   printf("Error getting address information for UDP server socket\n");
 	   exit(1);
 	}	
-    
-    	if(bind(fd_udp,res->ai_addr, res->ai_addrlen) == -1)
-	{
-	   printf("Error binding to UDP server socket\n");
-           freeaddrinfo(res);	
-	}
 	
 	freeaddrinfo(res);
 	
@@ -122,22 +171,110 @@ int main(int argc, char *argv[])
 		// select upon which file descriptor to act 
         	counter = select(maxfd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         	if(counter<=0)  exit(1);
-		
-		
+	        	
 		
 		// UDP
 		if (FD_ISSET(fd_udp, &rfds))
 		{
-			
+			if (udp_state == not_waiting)
+                        {
+                            printf("WARNING - Received trash through UDP\n");
+                            addrlen = sizeof(addr);
+                            n = recvfrom(fd, udp_buffer, 999, 0, &addr, &addrlen);
+                            if (n == -1)
+                            {
+                                printf("Meter aqui um erro => trabalho para o Pato\n");
+                                exit(-1);
+                            }
+                            udp_buffer[n] = '\0';
+                            printf("This is the trash\n");
+                            printf("%s", udp_buffer);
+                            printf("\n That was it\n");
+                        }
+                        else if (udp_state == waiting_for_regok)
+                        {
+                            addrlen = sizeof(addr);
+                            n = recvfrom(fd, udp_buffer, 999, 0, &addr, &addrlen);
+                            if (n == -1)
+                            {
+                                printf("Meter aqui um erro => trabalho para o Pato\n");
+                                exit(-1);
+                            }
+                            udp_buffer[n] = '\0';
+                            if (!strcmp(udp_buffer, "OKREG")){
+                                printf("We received the confirmation of registration from the server\n");
+                                udp_state = not_waiting;
+                            }
+                            else
+                            {                       
+                                printf("WARNING - Received trash through UDP\n");
+                                printf("This is the trash\n");
+                                printf("%s", udp_buffer);
+                                printf("\n That was it\n");
+                            }
+                        }
+                        else if (udp_state == waiting_for_unregok)
+                        {
+                            addrlen = sizeof(addr);
+                            n = recvfrom(fd, udp_buffer, 999, 0, &addr, &addrlen);
+                            if (n == -1)
+                            {
+                                printf("Meter aqui um erro => trabalho para o Pato\n");
+                                exit(-1);
+                            }
+                            udp_buffer[n] = '\0';
+                            if (!strcmp(udp_buffer, "OKUNREG")) 
+                            {
+                                printf("We received the confirmation of unregistration from the server\n");
+                                udp_state = not_waiting;   
+                            }
+                            else
+                            {
+                                printf("WARNING - Received trash through UDP\n");
+                                printf("This is the trash\n");
+                                printf("%s", udp_buffer);
+                                printf("\n That was it\n");
+                            }
+                        }
+                        else if (udp_state == waiting_for_list)
+                        {
+                            
+                            addrlen = sizeof(addr);
+                            n = recvfrom(fd, udp_buffer, 999, 0, &addr, &addrlen);
+                            if (n == -1)
+                            {
+                                printf("Meter aqui um erro => trabalho para o Pato\n");
+                                exit(-1);
+                            }
+                            udp_buffer[n] = '\0';
+                            if (!strcmp(udp_buffer, "NODESLIST")) 
+                            {
+                                printf("We received the list of nodes from the server\n");
+                                // assign a random node 
+
+                                udp_state = not_waiting;   
+                            }
+                            else
+                            {
+                                printf("WARNING - Received trash through UDP\n");
+                                printf("This is the trash\n");
+                                printf("%s", udp_buffer);
+                                printf("\n That was it\n");
+                            }
+                        }
 		}
 		
 		 // Ler input do utilizador no terminal
     		if (FD_ISSET(STDIN_FILENO, &rfds))
 		{
-		   user_input = readCommand(&instr_code);
-			 
-			
-		   free(user_input);
+		    user_input = readCommand(&instr_code);
+		    if (command == JOIN_ID){
+
+                    }
+
+                         
+		    	
+		    free(user_input);
 		}
 		
 		
