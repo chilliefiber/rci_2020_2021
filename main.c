@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
 	act.sa_handler = SIG_IGN;
 	if(sigaction(SIGPIPE, &act, NULL) == -1) exit(1);
 	
-	if(argc != 5 || isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || strcmp("193.136.138.142", argv[3]) != 0 || strcmp("59000", argv[4]) != 0)
+	if(argc != 5 || isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
 	{
 		printf("Usage: ./ndn IP TCP regIP regUDP\n");
 		exit(1);
@@ -306,13 +306,21 @@ int main(int argc, char *argv[])
 		    user_input = readCommand(&instr_code);
 		    if (instr_code == JOIN_ID && _state == EMPTY)
 		    {
-
+			if(sscanf(user_input,"%d %d",&self.net,&self.id) != 2)
+			{
+		            printf("Error in sscanf JOIN_ID\n");
+			    exit(1);
+			}
+			strcpy(self.node_IP, argv[1]);
+			strcpy(self.node_port, argv[2]);
+			str_id = safeMalloc(sizeof(self.id)+1);
+			sprintf(str_id,"%d.",self.id);
+			    
+			_state = ONENODE;
                     }
 		    
 		    if (instr_code == CREATE && _state != EMPTY)
 		    {
-			str_id = safeMalloc(sizeof(self.id)+1);
-			sprintf(str_id,"%d.",self.id);
 			    
 		    	head = createinsertObject(head,user_input,str_id);
 		    }
