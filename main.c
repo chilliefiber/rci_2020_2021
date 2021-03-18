@@ -56,6 +56,36 @@ typedef struct node_list{
     struct node_list *next;
 } node_list;
 
+typedef struct list_objects{
+	char *objct;
+	struct list_objects *next;
+}list_objects;
+
+list_objects *createinsertObject(list_objects *head, char *subname)
+{
+    list_objects *tmp = head;
+    list_objects *new_obj = safeMalloc(sizeof(list_objects));
+    new_obj->object = safeMalloc(strlen(subname)+1);
+    strcpy(new_obj->object, subname);
+
+    if(head == NULL)
+    {
+	head = new_obj;
+	new_obj->next = NULL;
+    }
+    else
+    {
+	 while(tmp->next != NULL)
+        {
+            tmp = tmp->next;
+        }
+        tmp->next = new_obj;
+        new_obj->next = NULL;
+    }
+	
+    return head;
+}
+
 node_list *parseNodelist(char* datagram, int *num_nodes)
 {
     int datagram_ix = 0, line_ix=0;
@@ -89,7 +119,8 @@ node_list *parseNodelist(char* datagram, int *num_nodes)
     return list;
 }
 
-parseLine(node_list **list, char *line)
+void parseLine(node_list **list, char *line)
+{
     node_list *this = safeMalloc(sizeof(node_list));
     this.next = NULL;
     node_list *aux = *list;
@@ -103,7 +134,7 @@ parseLine(node_list **list, char *line)
         // place newly created element in list
         aux->next = this;
     }
- 
+}
 // enum dos vários estados associados à rede de nós
 // EMPTY no caso em que não existem nós
 // ONENODE no caso em que a rede tem um só nó,
@@ -124,6 +155,8 @@ int main(int argc, char *argv[])
         enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
         socklen_t addrlen;
         no self;
+	
+	list_objects *head = NULL;
 	
 	struct sigaction act;
 	// Protection against SIGPIPE signals 
@@ -268,12 +301,16 @@ int main(int argc, char *argv[])
     		if (FD_ISSET(STDIN_FILENO, &rfds))
 		{
 		    user_input = readCommand(&instr_code);
-		    if (command == JOIN_ID){
+		    if (instr_code == JOIN_ID && _state == EMPTY)
+		    {
 
                     }
-
-                         
-		    	
+		    
+		    if (instr_code == CREATE && _state != EMPTY)
+		    {
+		    	head = createinsertObject(head,user_input);
+		    }
+			
 		    free(user_input);
 		}
 		
