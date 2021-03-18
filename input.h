@@ -20,6 +20,8 @@ int isIP(char ip[]);
 
 int isPort(char port[]);
 
+int isName(char name[]);
+
 void* safeMalloc(size_t size);
 
 void* safeCalloc(size_t nmemb, size_t size);
