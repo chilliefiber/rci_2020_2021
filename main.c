@@ -126,7 +126,7 @@ void parseLine(node_list **list, char *line)
     node_list *this = safeMalloc(sizeof(node_list));
     this.next = NULL;
     node_list *aux = *list;
-    sscanf("%s %s", this.node_IP, this.node_port);
+    sscanf(line,"%s %s", this.node_IP, this.node_port);
     if (*list == NULL)
         *list = this;
     else
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
                             n = recvfrom(fd, udp_buffer, 999, 0, &addr, &addrlen);
                             if (n == -1)
                             {
-                                printf("Meter aqui um erro => trabalho para o Pato\n");
+                                printf("Error in recvfrom!\n");
                                 exit(-1);
                             }
                             udp_buffer[n] = '\0';
@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
                             n = recvfrom(fd, udp_buffer, 999, 0, &addr, &addrlen);
                             if (n == -1)
                             {
-                                printf("Meter aqui um erro => trabalho para o Pato\n");
+                                printf("Error in recvfrom!\n");
                                 exit(-1);
                             }
                             udp_buffer[n] = '\0';
@@ -254,7 +254,7 @@ int main(int argc, char *argv[])
                             n = recvfrom(fd, udp_buffer, 999, 0, &addr, &addrlen);
                             if (n == -1)
                             {
-                                printf("Meter aqui um erro => trabalho para o Pato\n");
+                                printf("Error in recvfrom!\n");
                                 exit(-1);
                             }
                             udp_buffer[n] = '\0';
@@ -278,7 +278,7 @@ int main(int argc, char *argv[])
                             n = recvfrom(fd, udp_buffer, 999, 0, &addr, &addrlen);
                             if (n == -1)
                             {
-                                printf("Meter aqui um erro => trabalho para o Pato\n");
+                                printf("Error in recvfrom!\n");
                                 exit(-1);
                             }
                             udp_buffer[n] = '\0';
