@@ -12,7 +12,8 @@
 #include <signal.h>
 
 #include "input.h"
-
+#include "udp_parser.h"
+#include "errcheck.h"
 #define max(A,B) ((A)>=(B)?(A):(B))
 
 
@@ -50,11 +51,6 @@ typedef struct internals{
     struct viz *next;
 }internals;
 
-typedef struct node_list{
-    char node_IP[INET_ADDRSTRLEN]; //endereço IP do nó	
-    char node_port[NI_MAXSERV]; //Porto TCP do nó
-    struct node_list *next;
-} node_list;
 
 typedef struct list_objects{
     char *objct;
@@ -88,23 +84,23 @@ list_objects *createinsertObject(list_objects *head, char *subname, char *str_id
     return head;
 }
 
-// enum dos vários estados associados à rede de nós
-// NONODES no caso em que não existem nós
-// TWONODES no caso em que a rede tem dois nós
-// MANYNODES no caso em que a rede tem mais que dois nós
-enum state {NONODES, TWONODES, MANYNODES};
 
 int main(int argc, char *argv[])
 {
+    // enum dos vários estados associados à rede de nós
+    // NONODES no caso em que não existem nós
+    // TWONODES no caso em que a rede tem dois nós
+    // MANYNODES no caso em que a rede tem mais que dois nós
+    enum {NONODES, TWONODES, MANYNODES} state;
     fd_set rfds;
-    int fd_udp, maxfd, counter;
+    int n, fd_udp, max_fd, counter;
     int errcode;
     struct addrinfo hints, *res;
-    struct sockaddr_in addr;
+    struct sockaddr addr;
     enum instr instr_code;
     char *user_input, flag;
-    char message_buffer[150];
-    cache_objects cache[N];
+    char message_buffer[150], dgram[1000], *list_msg;
+    //cache_objects cache[N];
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
     socklen_t addrlen;
     no self;
@@ -130,7 +126,7 @@ int main(int argc, char *argv[])
         FD_SET(STDIN_FILENO, &rfds);
         max_fd=max(STDIN_FILENO, fd_udp);
         // select upon which file descriptor to act 
-        counter = select(maxfd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
+        counter = select(max_fd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         if(counter<=0)  exit(1);
         // UDP
         if (FD_ISSET(fd_udp, &rfds))
@@ -139,7 +135,7 @@ int main(int argc, char *argv[])
             {
                 printf("WARNING - Received trash through UDP\n");
                 addrlen = sizeof(addr);
-                n = recvfrom(fd, dgram, 999, 0, &addr, &addrlen);
+                n = recvfrom(fd_udp, dgram, 999, 0, &addr, &addrlen);
                 if (n == -1)
                 {
                     printf("Error in recvfrom!\n");
@@ -153,7 +149,7 @@ int main(int argc, char *argv[])
             else if (udp_state == waiting_for_regok)
             {
                 addrlen = sizeof(addr);
-                n = recvfrom(fd, dgram, 999, 0, &addr, &addrlen);
+                n = recvfrom(fd_udp, dgram, 999, 0, &addr, &addrlen);
                 if (n == -1)
                 {
                     printf("Error in recvfrom!\n");
@@ -163,7 +159,7 @@ int main(int argc, char *argv[])
                 if (!strcmp(dgram, "OKREG")){
                     printf("We received the confirmation of registration from the server\n");
                     udp_state = not_waiting;
-                    state = TWO_NODES; //isto so para ser diferente de NONODESde momento
+                    state = TWONODES; //isto so para ser diferente de NONODESde momento
                 }
                 else
                 {                       
@@ -176,7 +172,7 @@ int main(int argc, char *argv[])
             else if (udp_state == waiting_for_unregok)
             {
                 addrlen = sizeof(addr);
-                n = recvfrom(fd, dgram, 999, 0, &addr, &addrlen);
+                n = recvfrom(fd_udp, dgram, 999, 0, &addr, &addrlen);
                 if (n == -1)
                 {
                     printf("Error in recvfrom!\n");
@@ -187,7 +183,7 @@ int main(int argc, char *argv[])
                 {
                     printf("We received the confirmation of unregistration from the server\n");
                     udp_state = not_waiting;   
-                    state = NO_NODES;
+                    state = NONODES;
                 }
                 else
                 {
@@ -200,7 +196,7 @@ int main(int argc, char *argv[])
             else if (udp_state == waiting_for_list)
             { 
                 addrlen = sizeof(addr);
-                n = recvfrom(fd, dgram, 999, 0, &addr, &addrlen);
+                n = recvfrom(fd_udp, dgram, 999, 0, &addr, &addrlen);
                 if (n == -1)
                 {
                     printf("Error in recvfrom!\n");
@@ -231,12 +227,12 @@ int main(int argc, char *argv[])
                     
                     // criar string para enviar o registo do nó
                     errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.node_IP, self.node_port);  
-                    if (message_buffer == NULL || errcode < 0 || errcode => 150)
+                    if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                     {
                         fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
                         exit(-1);
                     }
-                    errcode = sendto(fd_udp, "REG net IP TCP", strlen(message_buffer), res->ai_addr, res->ai_addrlen);
+                    errcode = sendto(fd_udp, "REG net IP TCP", strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
                     if (errcode == -1)
                     {
                         fprintf(stderr, "error in REG UDP message send: %s\n", strerror(errno));
@@ -286,12 +282,12 @@ int main(int argc, char *argv[])
                 }	
                 // criar string para enviar o pedido de nós
                 errcode = snprintf(message_buffer, 150, "NODES %u", self.net);  
-                if (message_buffer == NULL || errcode < 0 || errcode => 100)
+                if (message_buffer == NULL || errcode < 0 || errcode >= 100)
                 {
                     fprintf(stderr, "error in JOIN UDP message creation: %s\n", strerror(errno));
                     exit(-1);
                 }
-                errcode = sendto(fd_udp, message_buffer, strlen(message_buffer), res->ai_addr, res->ai_addrlen);
+                errcode = sendto(fd_udp, message_buffer, strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
                 if (errcode == -1)
                 {
                     fprintf(stderr, "error in JOIN UDP message send: %s\n", strerror(errno));
@@ -316,12 +312,12 @@ int main(int argc, char *argv[])
 
                 // criar string para enviar o desregisto (?isto é uma palavra) do nó
                 errcode = snprintf(message_buffer, 150, "UNREG %u %s %s", self.net, self.node_IP, self.node_port);  
-                if (message_buffer == NULL || errcode < 0 || errcode => 150)
+                if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                 {
                     fprintf(stderr, "error in UNREG UDP message creation: %s\n", strerror(errno));
                     exit(-1);
                 }
-                errcode = sendto(fd_udp, "REG net IP TCP", strlen(message_buffer), res->ai_addr, res->ai_addrlen);
+                errcode = sendto(fd_udp, "REG net IP TCP", strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
                 if (errcode == -1)
                 {
                     fprintf(stderr, "error in UNREG UDP message send: %s\n", strerror(errno));
@@ -330,8 +326,10 @@ int main(int argc, char *argv[])
                 freeaddrinfo(res);
                 udp_state = waiting_for_unregok;
             }
-            else if (instr_code == CREATE && _state != NONODES)
+            else if (instr_code == CREATE && state != NONODES)
                 head = createinsertObject(head,user_input,str_id);
+            else if(instr_code == EXIT)
+                exit(0);
 
             free(user_input);
         }

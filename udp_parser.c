@@ -1,9 +1,18 @@
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include "udp_parser.h"
+#include "errcheck.h"
+
+extern int errno;
+
 void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
 {
     int rvalue;
     node_list *this = safeMalloc(sizeof(node_list));
-    this.next = NULL;
-    rvalue = sscanf(line,"%s %s\n", this.node_IP, this.node_port);
+    this->next = NULL;
+    rvalue = sscanf(datagram,"%s %s\n", this->node_IP, this->node_port);
     if (rvalue == EOF){
         fprintf(stderr, "error in parseNodeListRecursive(): %s\n", strerror(errno));
     }
@@ -20,7 +29,7 @@ void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
     else
     {
         // ir até ao último elemento da lista 
-        for (aux; aux->next != NULL; aux = aux->next);
+        for (; aux->next != NULL; aux = aux->next);
         // colocar o elemento recém-criado 
         aux->next = this;
     }
@@ -58,7 +67,7 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
     // Depois colocar nas funções uma flag para que quando haja erros ele faz
     // exit no main, limpando a memória alocada toda (se o prof quiser, se bem
     // que é desnecessário)
-    if (message_supposed_to_recv == NULL || error_flag < 0 || error_flag => 100)
+    if (message_supposed_to_recv == NULL || error_flag < 0 || error_flag >= 100)
         fprintf(stderr, "error in isNodesList(): %s\n", strerror(errno));
     char c = datagram[0];
     unsigned int ix=0;
