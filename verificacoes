@@ -1,0 +1,2 @@
+verificar se temos de ver se o strcmp esta seguro: nao ha nulls a entrar nem arrays de caracteres nao terminados
+passar todos os printf erro para a lengalenga do strerror
