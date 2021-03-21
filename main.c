@@ -92,8 +92,10 @@ int main(int argc, char *argv[])
     // TWONODES no caso em que a rede tem dois nós
     // MANYNODES no caso em que a rede tem mais que dois nós
     enum {NONODES, TWONODES, MANYNODES} state;
+    state = NONODES;
+    node_list *nodes_fucking_list;
     fd_set rfds;
-    int n, fd_udp, max_fd, counter;
+    int n, num_nodes, fd_udp, max_fd, counter;
     int errcode;
     struct addrinfo hints, *res;
     struct sockaddr addr;
@@ -129,6 +131,7 @@ int main(int argc, char *argv[])
         counter = select(max_fd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         if(counter<=0)  exit(1);
         // UDP
+
         if (FD_ISSET(fd_udp, &rfds))
         {
             if (udp_state == not_waiting)
@@ -211,7 +214,20 @@ int main(int argc, char *argv[])
                     printf("We received the list of nodes from the server\n");
                     // assign a random node 
                     if (list_msg)
+                    {
                         printf("Há mais gajos na lista\n");
+                        parseNodeListRecursive(list_msg, &num_nodes, &nodes_fucking_list);
+
+                        while (nodes_fucking_list != NULL)
+                        {
+                            printf("%s\n", nodes_fucking_list->node_IP);
+                            printf("That was the mufacking IP\n");
+                            printf("%s\n", nodes_fucking_list->node_port);
+                            printf("That was the mufacking port\n");
+                            printf("%s %s\n", nodes_fucking_list->node_IP, nodes_fucking_list->node_port);
+                            nodes_fucking_list = nodes_fucking_list->next;
+                        }
+                    }
                     else
                         printf("Loneliness is not a phase\n");
                     memset(&hints, 0, sizeof hints);
@@ -232,7 +248,7 @@ int main(int argc, char *argv[])
                         fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
                         exit(-1);
                     }
-                    errcode = sendto(fd_udp, "REG net IP TCP", strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
+                    errcode = sendto(fd_udp, message_buffer, strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
                     if (errcode == -1)
                     {
                         fprintf(stderr, "error in REG UDP message send: %s\n", strerror(errno));
@@ -250,7 +266,6 @@ int main(int argc, char *argv[])
                 }
             }
         }
-
         // Ler input do utilizador no terminal
         if (FD_ISSET(STDIN_FILENO, &rfds))
         {
@@ -317,7 +332,7 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "error in UNREG UDP message creation: %s\n", strerror(errno));
                     exit(-1);
                 }
-                errcode = sendto(fd_udp, "REG net IP TCP", strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
+                errcode = sendto(fd_udp, message_buffer, strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
                 if (errcode == -1)
                 {
                     fprintf(stderr, "error in UNREG UDP message send: %s\n", strerror(errno));

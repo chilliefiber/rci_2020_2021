@@ -54,7 +54,6 @@ char *readCommand(enum instr *instr_code)
 			if(checkDigit(second) == 1 && checkDigit(id) == 1)
 			{
 				*instr_code = JOIN_ID;
-				
 				return getParam(terminal);
 			}
 			if(checkDigit(second) != 1)

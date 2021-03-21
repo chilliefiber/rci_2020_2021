@@ -69,6 +69,8 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
     // que é desnecessário)
     if (message_supposed_to_recv == NULL || error_flag < 0 || error_flag >= 100)
         fprintf(stderr, "error in isNodesList(): %s\n", strerror(errno));
+    printf("This is the message we are supposed to receive:\n");
+    printf("%s\n", message_supposed_to_recv);
     char c = datagram[0];
     unsigned int ix=0;
     while(c != '\0')
@@ -76,8 +78,12 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
         message_until_newline[ix] = c;
         if (c == '\n')
         {
+            message_until_newline[ix+1] = '\0';
+            printf("Esta é a message_until_newline:\n");
+            printf("%s\n", message_until_newline);
             // se a primeira linha lida foi a do comando recebemos a mensagem correta
-            if (!strcmp(message_until_newline, message_supposed_to_recv)){
+            if (!(error_flag = strcmp(message_until_newline, message_supposed_to_recv))){
+                printf("This is error_flag: %d\n", error_flag);
                 *nodeslist_received = 1;
                 // se ainda há mais linhas para ler, então a lista não vem vazia
                 // nesse caso, devolvemos uma string que aponta para o início
@@ -87,12 +93,16 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
                 if (datagram[ix + 1] != '\0')
                     return datagram + ix + 1;
             }
+            printf("this is error_flag: %d\n", error_flag);
             return NULL;
         }
         ix = ix + 1;
         // caso haja 100 caracteres antes do \n, então assumimos que a mensagem estava mal formatada, ou nao era um
         // NODESLIST
-        if (ix == 100)
+        // pode parecer estranho 100 - 1: o -1 aparece porque para além do próximo caractere, temos sempre de escrever
+        // o \0. Logo se o ix é 100 - 1, se o próximo caractere terminasse a mensagem teríamos de escrever no ix 100 -1 (ainda válido)
+        // e no 100 para meter o \0, e excederiamos a buffer :)
+        if (ix == 100 - 1)
             return NULL;
         c = datagram[ix];
     }
