@@ -9,10 +9,14 @@ extern int errno;
 
 void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
 {
+    printf("num_nodes is %d\n", *num_nodes);
+    printf("datagram is:\n%s", datagram);
     int rvalue;
     node_list *this = safeMalloc(sizeof(node_list));
     this->next = NULL;
     rvalue = sscanf(datagram,"%s %s\n", this->node_IP, this->node_port);
+    printf("This is node_IP:\n%s\n", this->node_IP);
+    printf("This is node_port:\n%s\n", this->node_port);
     if (rvalue == EOF){
         fprintf(stderr, "error in parseNodeListRecursive(): %s\n", strerror(errno));
     }
@@ -23,17 +27,14 @@ void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
         *list = NULL;
         return;
     }
-    node_list *aux = *list;
-    if (aux == NULL)
-        *list = this;
-    else
-    {
-        // ir até ao último elemento da lista 
-        for (; aux->next != NULL; aux = aux->next);
-        // colocar o elemento recém-criado 
-        aux->next = this;
-    }
+    // como não interessa a ordem porque sai a lista, inserimos cada nó IP/port
+    // no início da lista
+    // visto que ao entrar nesta função pela primeira vez em cada datagrama
+    // NODESLIST, *list == NULL, isto funciona
+    this->next = *list;
+    *list = this;
     *num_nodes = (*num_nodes) + 1;
+    printf("num_nodes is now: %d\n", *num_nodes);
     int ix =0;
     char c = datagram[ix];
     // obrigatoriamente tem um \n devido ao sscanf, se aquilo

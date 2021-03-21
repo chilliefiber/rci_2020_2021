@@ -215,7 +215,11 @@ int main(int argc, char *argv[])
                     // assign a random node 
                     if (list_msg)
                     {
+                        num_nodes = 0;
                         printf("Há mais gajos na lista\n");
+                        // aqui, é preciso escrever código para limpar 
+                        // a memória da lista anterior, caso ela exista
+                        nodes_fucking_list = NULL;
                         parseNodeListRecursive(list_msg, &num_nodes, &nodes_fucking_list);
 
                         while (nodes_fucking_list != NULL)
