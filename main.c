@@ -84,7 +84,6 @@ list_objects *createinsertObject(list_objects *head, char *subname, char *str_id
     return head;
 }
 
-
 int main(int argc, char *argv[])
 {
     // enum dos vários estados associados à rede de nós
@@ -95,16 +94,13 @@ int main(int argc, char *argv[])
     state = NONODES;
     node_list *nodes_fucking_list;
     fd_set rfds;
-    int n, num_nodes, fd_udp, max_fd, counter;
+    int num_nodes, fd_udp, max_fd, counter;
     int errcode;
-    struct addrinfo hints, *res;
-    struct sockaddr addr;
     enum instr instr_code;
     char *user_input, flag;
     char message_buffer[150], dgram[1000], *list_msg;
     //cache_objects cache[N];
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
-    socklen_t addrlen;
     no self;
     list_objects *head = NULL;
     char *str_id;
@@ -131,57 +127,23 @@ int main(int argc, char *argv[])
         counter = select(max_fd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         if(counter<=0)  exit(1);
         // UDP
-
         if (FD_ISSET(fd_udp, &rfds))
         {
+            safeRecvFrom(fd_udp, dgram, 999);
             if (udp_state == not_waiting)
-            {
-                printf("WARNING - Received trash through UDP\n");
-                addrlen = sizeof(addr);
-                n = recvfrom(fd_udp, dgram, 999, 0, &addr, &addrlen);
-                if (n == -1)
-                {
-                    printf("Error in recvfrom!\n");
-                    exit(-1);
-                }
-                dgram[n] = '\0';
-                printf("This is the trash\n");
-                printf("%s", dgram);
-                printf("\n That was it\n");
-            }
+                warnOfTrashReceived("WARNING - Received trash through UDP: udp_state not_waiting\n", dgram);
             else if (udp_state == waiting_for_regok)
             {
-                addrlen = sizeof(addr);
-                n = recvfrom(fd_udp, dgram, 999, 0, &addr, &addrlen);
-                if (n == -1)
-                {
-                    printf("Error in recvfrom!\n");
-                    exit(-1);
-                }
-                dgram[n] = '\0';
                 if (!strcmp(dgram, "OKREG")){
                     printf("We received the confirmation of registration from the server\n");
                     udp_state = not_waiting;
                     state = TWONODES; //isto so para ser diferente de NONODESde momento
                 }
                 else
-                {                       
-                    printf("WARNING - Received trash through UDP\n");
-                    printf("This is the trash\n");
-                    printf("%s", dgram);
-                    printf("\n That was it\n");
-                }
+                    warnOfTrashReceived("WARNING - Received trash through UDP: udp_state waiting_for_regok\n", dgram);
             }
             else if (udp_state == waiting_for_unregok)
             {
-                addrlen = sizeof(addr);
-                n = recvfrom(fd_udp, dgram, 999, 0, &addr, &addrlen);
-                if (n == -1)
-                {
-                    printf("Error in recvfrom!\n");
-                    exit(-1);
-                }
-                dgram[n] = '\0';
                 if (!strcmp(dgram, "OKUNREG")) 
                 {
                     printf("We received the confirmation of unregistration from the server\n");
@@ -189,23 +151,10 @@ int main(int argc, char *argv[])
                     state = NONODES;
                 }
                 else
-                {
-                    printf("WARNING - Received trash through UDP\n");
-                    printf("This is the trash\n");
-                    printf("%s", dgram);
-                    printf("\n That was it\n");
-                }
+                    warnOfTrashReceived("WARNING - Received trash through UDP: udp_state waiting_for_unregok\n", dgram);
             }
             else if (udp_state == waiting_for_list)
             { 
-                addrlen = sizeof(addr);
-                n = recvfrom(fd_udp, dgram, 999, 0, &addr, &addrlen);
-                if (n == -1)
-                {
-                    printf("Error in recvfrom!\n");
-                    exit(-1);
-                }
-                dgram[n] = '\0';
                 // fazer função que verifica se temos uma lista de nós
                 list_msg = isNodesList(dgram, self.net, &flag);
                 // neste caso não recebemos
@@ -216,35 +165,15 @@ int main(int argc, char *argv[])
                     if (list_msg)
                     {
                         num_nodes = 0;
-                        printf("Há mais gajos na lista\n");
                         // aqui, é preciso escrever código para limpar 
                         // a memória da lista anterior, caso ela exista
+                        // na verdade, o correto será apagar a lista
+                        // imediatamente após a confirmação de que entrámos no servidor
+                        // e portanto não precisamos mais dela
                         nodes_fucking_list = NULL;
                         parseNodeListRecursive(list_msg, &num_nodes, &nodes_fucking_list);
-
-                        while (nodes_fucking_list != NULL)
-                        {
-                            printf("%s\n", nodes_fucking_list->node_IP);
-                            printf("That was the mufacking IP\n");
-                            printf("%s\n", nodes_fucking_list->node_port);
-                            printf("That was the mufacking port\n");
-                            printf("%s %s\n", nodes_fucking_list->node_IP, nodes_fucking_list->node_port);
-                            nodes_fucking_list = nodes_fucking_list->next;
-                        }
                     }
-                    else
-                        printf("Loneliness is not a phase\n");
-                    memset(&hints, 0, sizeof hints);
-                    hints.ai_family=AF_INET;
-                    hints.ai_socktype=SOCK_DGRAM;
-                    errcode = getaddrinfo(argv[3],argv[4],&hints,&res);
-                    // usar o strerror pato
-                    if(errcode!=0)  
-                    {
-                        printf("Error getting address information for UDP server socket\n");
-                        exit(1);
-                    }	
-                    
+                    //write udp
                     // criar string para enviar o registo do nó
                     errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.node_IP, self.node_port);  
                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -252,22 +181,11 @@ int main(int argc, char *argv[])
                         fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
                         exit(-1);
                     }
-                    errcode = sendto(fd_udp, message_buffer, strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
-                    if (errcode == -1)
-                    {
-                        fprintf(stderr, "error in REG UDP message send: %s\n", strerror(errno));
-                        exit(-1);
-                    }
-                    freeaddrinfo(res);
+                    sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
                     udp_state = waiting_for_regok;
                 }
                 else
-                {
-                    printf("WARNING - Received trash through UDP\n");
-                    printf("This is the trash\n");
-                    printf("%s", dgram);
-                    printf("\n That was it\n");
-                }
+                    warnOfTrashReceived("WARNING - Received trash through UDP: udp_state waiting_for_list\n", dgram);
             }
         }
         // Ler input do utilizador no terminal
@@ -289,16 +207,6 @@ int main(int argc, char *argv[])
                 // passar isto para snprintf
                 // isto é um buffer overflow
                 sprintf(str_id,"%d.",self.id);
-                memset(&hints, 0, sizeof hints);
-                hints.ai_family=AF_INET;
-                hints.ai_socktype=SOCK_DGRAM;
-                errcode = getaddrinfo(argv[3],argv[4],&hints,&res);
-                // usar o strerror pato
-                if(errcode!=0)  
-                {
-                    printf("Error getting address information for UDP server socket\n");
-                    exit(1);
-                }	
                 // criar string para enviar o pedido de nós
                 errcode = snprintf(message_buffer, 150, "NODES %u", self.net);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 100)
@@ -306,29 +214,11 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "error in JOIN UDP message creation: %s\n", strerror(errno));
                     exit(-1);
                 }
-                errcode = sendto(fd_udp, message_buffer, strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
-                if (errcode == -1)
-                {
-                    fprintf(stderr, "error in JOIN UDP message send: %s\n", strerror(errno));
-                    exit(-1);
-                }
-                freeaddrinfo(res);
+                sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in JOIN UDP message send\n");
                 udp_state = waiting_for_list;
             }
             else if (instr_code == LEAVE && state != NONODES)
             {
-
-                memset(&hints, 0, sizeof hints);
-                hints.ai_family=AF_INET;
-                hints.ai_socktype=SOCK_DGRAM;
-                errcode = getaddrinfo(argv[3],argv[4],&hints,&res);
-                // usar o strerror pato
-                if(errcode!=0)  
-                {
-                    printf("Error getting address information for UDP server socket\n");
-                    exit(1);
-                }	
-
                 // criar string para enviar o desregisto (?isto é uma palavra) do nó
                 errcode = snprintf(message_buffer, 150, "UNREG %u %s %s", self.net, self.node_IP, self.node_port);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -336,23 +226,15 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "error in UNREG UDP message creation: %s\n", strerror(errno));
                     exit(-1);
                 }
-                errcode = sendto(fd_udp, message_buffer, strlen(message_buffer), 0, res->ai_addr, res->ai_addrlen);
-                if (errcode == -1)
-                {
-                    fprintf(stderr, "error in UNREG UDP message send: %s\n", strerror(errno));
-                    exit(-1);
-                }
-                freeaddrinfo(res);
+                sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in UNREG UDP message send\n");
                 udp_state = waiting_for_unregok;
             }
             else if (instr_code == CREATE && state != NONODES)
                 head = createinsertObject(head,user_input,str_id);
             else if(instr_code == EXIT)
                 exit(0);
-
             free(user_input);
         }
     }	
     return 0;
 }
-

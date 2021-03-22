@@ -24,6 +24,13 @@ void helpMenu(void)
 	printf("exit\n\n"); //Fecho da aplicação
 }
 
+void warnOfTrashReceived(char* warning, char *trash)
+{
+    fputs(warning, stdout);
+    fputs("This is the trash\n", stdout);
+    fputs(trash, stdout);
+    fputs("\n That was it\n", stdout);
+}
 char* getParam(char *input)
 {
   // ignorar leading whitespace

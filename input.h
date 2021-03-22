@@ -10,6 +10,7 @@ enum instr {ERR, JOIN_ID, JOIN_LINK, CREATE, GET, ST, SR, SC, LEAVE, EXIT};
 
 void helpMenu(void);
 
+void warnOfTrashReceived(char* warning, char *trash);
 char* getParam(char *input);
 
 char *readCommand(enum instr *instr_code);

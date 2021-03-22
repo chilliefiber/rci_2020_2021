@@ -12,4 +12,5 @@ typedef struct node_list{
 
 void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list);
 char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received);
+void freeNodeList(node_list **list);
 #endif

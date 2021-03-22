@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 #include "udp_parser.h"
 #include "errcheck.h"
 
@@ -9,14 +10,10 @@ extern int errno;
 
 void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
 {
-    printf("num_nodes is %d\n", *num_nodes);
-    printf("datagram is:\n%s", datagram);
     int rvalue;
     node_list *this = safeMalloc(sizeof(node_list));
     this->next = NULL;
     rvalue = sscanf(datagram,"%s %s\n", this->node_IP, this->node_port);
-    printf("This is node_IP:\n%s\n", this->node_IP);
-    printf("This is node_port:\n%s\n", this->node_port);
     if (rvalue == EOF){
         fprintf(stderr, "error in parseNodeListRecursive(): %s\n", strerror(errno));
     }
@@ -34,7 +31,6 @@ void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
     this->next = *list;
     *list = this;
     *num_nodes = (*num_nodes) + 1;
-    printf("num_nodes is now: %d\n", *num_nodes);
     int ix =0;
     char c = datagram[ix];
     // obrigatoriamente tem um \n devido ao sscanf, se aquilo
@@ -47,7 +43,6 @@ void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
     // caso contrário, vamos ler mais uma linha
     if (datagram[ix + 1] != '\0')
         parseNodeListRecursive(datagram + ix + 1, num_nodes, list);
-
 }
 
 
@@ -70,8 +65,6 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
     // que é desnecessário)
     if (message_supposed_to_recv == NULL || error_flag < 0 || error_flag >= 100)
         fprintf(stderr, "error in isNodesList(): %s\n", strerror(errno));
-    printf("This is the message we are supposed to receive:\n");
-    printf("%s\n", message_supposed_to_recv);
     char c = datagram[0];
     unsigned int ix=0;
     while(c != '\0')
@@ -80,11 +73,9 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
         if (c == '\n')
         {
             message_until_newline[ix+1] = '\0';
-            printf("Esta é a message_until_newline:\n");
             printf("%s\n", message_until_newline);
             // se a primeira linha lida foi a do comando recebemos a mensagem correta
             if (!(error_flag = strcmp(message_until_newline, message_supposed_to_recv))){
-                printf("This is error_flag: %d\n", error_flag);
                 *nodeslist_received = 1;
                 // se ainda há mais linhas para ler, então a lista não vem vazia
                 // nesse caso, devolvemos uma string que aponta para o início
@@ -94,7 +85,6 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
                 if (datagram[ix + 1] != '\0')
                     return datagram + ix + 1;
             }
-            printf("this is error_flag: %d\n", error_flag);
             return NULL;
         }
         ix = ix + 1;
@@ -109,6 +99,19 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
     }
     // chegámos ao \0 mas não chegámos a 100 caracteres nem ao \n
     return NULL;
+}
+
+// deixo esta função já feita
+// de momento não a vamos utilizar
+void freeNodeList(node_list **list)
+{
+   node_list *aux;
+   while(*list != NULL)
+    {
+        aux = *list;
+        *list = (*list)->next;
+        free(aux);
+    }
 }
 /*
 node_list *parseNodelist(char* datagram, int *num_nodes)
