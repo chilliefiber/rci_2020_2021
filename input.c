@@ -250,6 +250,11 @@ int isName(char name[])
 	char *token;
 	int i, count_point = 0;
 	
+	if(name[0] == '.')
+	{
+		return 0;
+	}
+	
 	for(i=0; i<strlen(name); i++)
 	{
 		if(name[i] == '.' && i != strlen(name)-1)
