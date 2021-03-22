@@ -246,7 +246,7 @@ int isPort(char port[])
 }
 
 int isName(char name[])
-{
+{ 
 	char *token;
 	int i, count_point = 0;
 	
@@ -268,14 +268,16 @@ int isName(char name[])
 		return 0;
 	}
 	
-	
-	token = strtok(name,".");
+	char *str_name = safeMalloc(strlen(name)+1);
+	strcpy(str_name,name);
+	token = strtok(str_name,".");
 	
 	if(checkDigit(token) == 1)
 	{
+		free(str_name);
 		return 1;
 	}
-
+	free(str_name);
 	return 0;
 }
 
