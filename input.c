@@ -54,6 +54,12 @@ char *readCommand(enum instr *instr_code)
 	size_input = sscanf(terminal,"%s %s %s %s %s", command, second, id, bootIP, bootTCP);
 	*instr_code = ERR;
 	
+	if(size_input<=0)
+	{
+		printf("Error in command input!\n");
+		return NULL;
+	}
+	
 	if(strcmp("join",command) == 0)
 	{
 		if(size_input == 3)
