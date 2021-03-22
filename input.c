@@ -248,6 +248,21 @@ int isPort(char port[])
 int isName(char name[])
 {
 	char *token;
+	int i, count_point = 0;
+	
+	for(i=0; i<strlen(name); i++)
+	{
+		if(name[i] == '.' && i != strlen(name)-1)
+		{
+			count_point++;
+		}
+	}
+	
+	if(count_point < 1)
+	{
+		return 0;
+	}
+	
 	
 	token = strtok(name,".");
 	
