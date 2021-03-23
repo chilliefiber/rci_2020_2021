@@ -13,7 +13,18 @@ void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
     int rvalue;
     node_list *this = safeMalloc(sizeof(node_list));
     this->next = NULL;
-    rvalue = sscanf(datagram,"%s %s\n", this->node_IP, this->node_port);
+    // nota importante:
+    // cheira me que o sscanf faria cocó caso houvesse mais
+    // caracteres na primeira/segunda palavra do datagram
+    // do que no this->IP/this->port. Nomeadamente, penso
+    // que não iria colocar o \0. Isso é problemático porque
+    // no main fazemos strncpy daqui, e o strncpy não mete \0
+    // se não chegarmos a um \0
+    // nesse caso, seria apropriado colocar um \0
+    // em this->IP/this->port no ultimo indice aqui
+    // ou possivelmente no ultimo indice da string dest para onde fazemos
+    // strncpy
+    rvalue = sscanf(datagram,"%s %s\n", this->IP, this->port);
     if (rvalue == EOF){
         fprintf(stderr, "error in parseNodeListRecursive(): %s\n", strerror(errno));
     }
@@ -105,8 +116,8 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
 // de momento não a vamos utilizar
 void freeNodeList(node_list **list)
 {
-   node_list *aux;
-   while(*list != NULL)
+    node_list *aux;
+    while(*list != NULL)
     {
         aux = *list;
         *list = (*list)->next;
@@ -152,7 +163,7 @@ void addLineToList(node_list **list, char *line)
     node_list *this = safeMalloc(sizeof(node_list));
     this.next = NULL;
     node_list *aux = *list;
-    sscanf(line,"%s %s ", this.node_IP, this.node_port);
+    sscanf(line,"%s %s ", this.IP, this.port);
     if (*list == NULL)
         *list = this;
     else

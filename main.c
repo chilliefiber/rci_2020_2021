@@ -32,8 +32,8 @@ typedef struct no{
     unsigned int net; //identificador da rede
     object *conj_objects; //conjunto de objetos nomeados contidos num nó
     int id;    //identificador do nó
-    char node_IP[INET_ADDRSTRLEN]; //endereço IP do nó
-    char node_port[NI_MAXSERV]; //Porto TCP do nó
+    char IP[INET_ADDRSTRLEN]; //endereço IP do nó
+    char port[NI_MAXSERV]; //Porto TCP do nó
     struct viz *externo; //Ponteiro para vizinho externo
     struct viz *backup; //Ponteiro para vizinho de recuperação
 }no;
@@ -41,14 +41,14 @@ typedef struct no{
 typedef struct viz{
     int fd; //file descriptor 
     int id;    //identificador do vizinho
-    char viz_IP[INET_ADDRSTRLEN]; //endereço IP do vizinho
-    char viz_port[NI_MAXSERV]; //Porto TCP do vizinho
+    char IP[INET_ADDRSTRLEN]; //endereço IP do vizinho
+    char port[NI_MAXSERV]; //Porto TCP do vizinho
 }viz;
 
 //lista dos vizinhos internos do nó
 typedef struct internals{
     struct viz *this;
-    struct viz *next;
+    struct internals *next;
 }internals;
 
 
@@ -90,17 +90,29 @@ int main(int argc, char *argv[])
     // NONODES no caso em que não existem nós
     // TWONODES no caso em que a rede tem dois nós
     // MANYNODES no caso em que a rede tem mais que dois nós
-    enum {NONODES, TWONODES, MANYNODES} state;
+    enum {NONODES, ONENODE, TWONODES, MANYNODES} network_state;
     state = NONODES;
     node_list *nodes_fucking_list;
     fd_set rfds;
-    int num_nodes, fd_udp, max_fd, counter;
+    int num_nodes, fd_udp, max_fd, counter, tcp_server_fd;
     int errcode;
     enum instr instr_code;
     char *user_input, flag;
     char message_buffer[150], dgram[1000], *list_msg;
+    struct addrinfo hints, *res;
+    socklen_t addrlen;
+    struct sockaddr_in addr;
+    // potencialmente não será o vizinho externo
+    // pode ser apenas um potencial vizinho externo,
+    // no caso em que fazemos JOIN, fizemos ligação
+    // mas ainda não recebemos a mensagem de contacto
+    viz external; 
+    // lista de vizinhos internos
+    internals *neighbours = NULL, *aux;
     //cache_objects cache[N];
+    // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
+    enum {waiting_for_backup} tcp_state;
     no self;
     list_objects *head = NULL;
     char *str_id;
@@ -115,17 +127,60 @@ int main(int argc, char *argv[])
         exit(1);
     }
     if ((fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) == -1) exit(1);
+    safeTCPSocket(&tcp_server_fd);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    safeGetAddrInfo(NULL, argv[2], &hints, &res, "Error getting address info for TCP server socket\n");
+    if (bind(tcp_server_fd, res->ai_addr, res->ai_addrlen) == -1)
+    {
+        fprintf(stderr, "Error binding TCP server: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    if (listen(tcp_server_fd, 5) == -1)
+    {
+        fprintf(stderr, "Error putting TCP server to listen: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
     helpMenu();
+    // este while precisa do for interno para lidar com vários fds set ao mesmo tempo
+    // ver slide do guia 
     while(1)
     {
         // initialize file descriptor set
         FD_ZERO(&rfds);
-        FD_SET(fd_udp, &rfds);
+        // se o processo não está em nenhuma rede, não é suposto contactarem nos por TCP
+        if (network_state != NONODES)
+            FD_SET(tcp_server_fd, &rfds); 
+        if (network_state != NONODES && network_state != ONENODE)
+        {
+
+            FD_SET(external.fd, &rfds);
+            aux = neighbours;
+            while (aux != NULL)
+            {
+                FD_SET(aux->this.fd, &rfds);
+                aux = aux->next;
+            }
+        }
+        if (udp_state != not_waiting)
+            FD_SET(fd_udp, &rfds);
         FD_SET(STDIN_FILENO, &rfds);
         max_fd=max(STDIN_FILENO, fd_udp);
         // select upon which file descriptor to act 
         counter = select(max_fd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         if(counter<=0)  exit(1);
+        // TCP
+        if (FD_ISSET(tcp_server_fd, &rfds))
+        {
+            addrlen = sizeof(addr);
+            // se este processo estava em modo ONENODE, o primeiro tipo que nos contactar
+            // será o nosso vizinho externo
+            
+            // se este processo estava em modo TWONODES ou MANYNODES, alguém que nos contacta
+            // será mais um vizinho interno
+        }
         // UDP
         if (FD_ISSET(fd_udp, &rfds))
         {
@@ -137,7 +192,7 @@ int main(int argc, char *argv[])
                 if (!strcmp(dgram, "OKREG")){
                     printf("We received the confirmation of registration from the server\n");
                     udp_state = not_waiting;
-                    state = TWONODES; //isto so para ser diferente de NONODESde momento
+                    network_state = TWONODES; //isto so para ser diferente de NONODESde momento
                 }
                 else
                     warnOfTrashReceived("WARNING - Received trash through UDP: udp_state waiting_for_regok\n", dgram);
@@ -148,7 +203,7 @@ int main(int argc, char *argv[])
                 {
                     printf("We received the confirmation of unregistration from the server\n");
                     udp_state = not_waiting;   
-                    state = NONODES;
+                    network_state = NONODES;
                 }
                 else
                     warnOfTrashReceived("WARNING - Received trash through UDP: udp_state waiting_for_unregok\n", dgram);
@@ -164,6 +219,11 @@ int main(int argc, char *argv[])
                     // assign a random node 
                     if (list_msg)
                     {
+
+                        // ao receber a lista, vai selecionar um nó qualquer e ligar-se a ele
+                        // de momento, liga-se ao último nó da lista enviada, que (da maneira que a lista é preenchida)
+                        // é o primeiro nó da nodes_fucking_list
+     
                         num_nodes = 0;
                         // aqui, é preciso escrever código para limpar 
                         // a memória da lista anterior, caso ela exista
@@ -172,17 +232,26 @@ int main(int argc, char *argv[])
                         // e portanto não precisamos mais dela
                         nodes_fucking_list = NULL;
                         parseNodeListRecursive(list_msg, &num_nodes, &nodes_fucking_list);
+                        safeTCPSocket(&(external.fd));
+                        connectTCP(nodes_fucking_list->IP, nodes_fucking_list->port, external.fd, 
+                                "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
+                        tcp_state = waiting_for_backup; // we're outnumbered, need backup
                     }
-                    //write udp
-                    // criar string para enviar o registo do nó
-                    errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.node_IP, self.node_port);  
-                    if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                    // neste caso a rede está vazia. O nó coloca-se no estado single_node e regista-se diretamente
+                    // no servidor de nós
+                    else
                     {
-                        fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
-                        exit(-1);
+                        network_state = ONENODE; // to rule them all
+                        // criar string para enviar o registo do nó
+                        errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.IP, self.port);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+                            fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
+                            exit(-1);
+                        }
+                        sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
+                        udp_state = waiting_for_regok;
                     }
-                    sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
-                    udp_state = waiting_for_regok;
                 }
                 else
                     warnOfTrashReceived("WARNING - Received trash through UDP: udp_state waiting_for_list\n", dgram);
@@ -200,8 +269,8 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
                 // MAIS OVERFLOWS
-                strcpy(self.node_IP, argv[1]);
-                strcpy(self.node_port, argv[2]);
+                strcpy(self.IP, argv[1]);
+                strcpy(self.port, argv[2]);
                 str_id = safeMalloc(sizeof(self.id)+1);
                 // bad monkey no banana
                 // passar isto para snprintf
@@ -220,7 +289,7 @@ int main(int argc, char *argv[])
             else if (instr_code == LEAVE && state != NONODES)
             {
                 // criar string para enviar o desregisto (?isto é uma palavra) do nó
-                errcode = snprintf(message_buffer, 150, "UNREG %u %s %s", self.net, self.node_IP, self.node_port);  
+                errcode = snprintf(message_buffer, 150, "UNREG %u %s %s", self.net, self.IP, self.port);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                 {
                     fprintf(stderr, "error in UNREG UDP message creation: %s\n", strerror(errno));

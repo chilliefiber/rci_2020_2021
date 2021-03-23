@@ -38,29 +38,29 @@ void* safeCalloc(size_t nmemb, size_t size)
 // em que meti isto como int
 void sendUDP(int fd, char* ip, char* port, char* text, char* addrinfo_error_msg, char* send_error_msg)
 {
-  struct addrinfo hints, *res;
-  memset(&hints, 0, sizeof hints);
-  hints.ai_family=AF_INET;
-  hints.ai_socktype=SOCK_DGRAM;
-  safeGetAddrInfo(ip, port, &hints, &res, addrinfo_error_msg);
-  if (sendto(fd, text, strlen(text), 0, res->ai_addr, res->ai_addrlen) == -1){  
-    fputs(send_error_msg, stdout);
-    fprintf(stderr, "error: %s\n", strerror(errno));
+    struct addrinfo hints, *res;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family=AF_INET;
+    hints.ai_socktype=SOCK_DGRAM;
+    safeGetAddrInfo(ip, port, &hints, &res, addrinfo_error_msg);
+    if (sendto(fd, text, strlen(text), 0, res->ai_addr, res->ai_addrlen) == -1){  
+        fputs(send_error_msg, stderr);
+        fprintf(stderr, "error: %s\n", strerror(errno));
+        freeaddrinfo(res);
+        exit(EXIT_FAILURE);
+    }
     freeaddrinfo(res);
-    exit(EXIT_FAILURE);
-  }
-  freeaddrinfo(res);
 }
 
 void safeGetAddrInfo(char* ip, char* port, struct addrinfo *hints, struct addrinfo **res, char* error_msg)
 {
-  size_t n;
-  n = getaddrinfo(ip, port, hints, res);
-  if (n != 0){
-    fputs(error_msg, stdout);
-    fprintf(stderr, "error: %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
-  }
+    size_t n;
+    n = getaddrinfo(ip, port, hints, res);
+    if (n != 0){
+        fputs(error_msg, stderr);
+        fprintf(stderr, "error: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 }
 
 // aqui perguntar ao prof se devemos usar os tipos de argumentos do recvfrom!!!
@@ -73,9 +73,42 @@ void safeRecvFrom(int fd, char *dgram, size_t len)
     n = recvfrom(fd, dgram, len, 0, &addr, &addrlen);
     if (n == -1)
     {
-        fputs("Error in recvfrom!\n", stdout);
+        fputs("Error in recvfrom!\n", stderr);
         fprintf(stderr, "error: %s\n", strerror(errno));
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
     dgram[n] = '\0';
+}
+
+// aqui talvez meter uma mensagem de erro individualizada como argumento para sabermos onde no programa crashou
+// ver safeGetAddrInfo
+void safeTCPSocket(int* fd)
+{
+    *fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (*fd == -1){
+        fputs("Error making a TCP socket!\n", stderr);
+        fprintf(stderr, "error: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+}
+
+
+void connectTCP(char *ip, char* port, int fd, int mode, char *addrinfo_error_msg, char *connect_error_msg)
+{
+  struct addrinfo hints, *res;
+  size_t n;
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  safeGetAddrInfo(ip, port, &hints, &res, addrinfo_error_msg);
+  n = connect(fd, res->ai_addr, res->ai_addrlen);
+  if (n == -1){
+    fputs(connect_error_msg, stderr);
+    fprintf(stderr, "error: %s\n", strerror(errno));
+    freeaddrinfo(res);
+    exit(EXIT_FAILURE);
+  }
+  freeaddrinfo(res);
+  return 1;
 }
