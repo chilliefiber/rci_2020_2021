@@ -1,6 +1,9 @@
+#ifndef TCP_H_CONST
+#define TCP_H_CONST
 #define MSG_PARTIAL 0
 #define MSG_FINISH 1
 #define MSG_ERROR 2
+#define N_MAX 150
 
 // estrutura para criar uma lista das diferentes 
 // mensagens lidas numa chamada de sistema read
@@ -36,5 +39,6 @@ messages* messagesAlloc(void);
 messages *processReadTCP(viz *sender, ssize_t start_ix);
 
 
+char readTCP(viz* sender);
 void freeMessage(messages *msg);
- 
+#endif 

@@ -7,4 +7,6 @@ void sendUDP(int fd, char* ip, char* port, char* text, char* addrinfo_error_msg,
 void safeGetAddrInfo(char* ip, char* port, struct addrinfo *hints, struct addrinfo **res, char* error_msg);
 void* safeCalloc(size_t nmemb, size_t size);
 void safeRecvFrom(int fd, char *dgram, size_t len);
+void safeTCPSocket(int* fd);
+void connectTCP(char *ip, char* port, int fd, char *addrinfo_error_msg, char *connect_error_msg);
 #endif

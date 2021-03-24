@@ -14,6 +14,7 @@
 #include "input.h"
 #include "udp_parser.h"
 #include "errcheck.h"
+#include "tcp.h"
 #define max(A,B) ((A)>=(B)?(A):(B))
 
 
@@ -78,12 +79,12 @@ list_objects *createinsertObject(list_objects *head, char *subname, char *str_id
     return head;
 }
 
-void addToList(internals * interns, viz *new)
+void addToList(internals *int_neighbours, viz *new)
 {
-    internals *aux = *intern;
-    *interns = safeMalloc(sizeof(internals));
-    *interns->viz = new;
-    *interns->next = aux;
+    internals *aux = int_neighbours;
+    int_neighbours = safeMalloc(sizeof(internals));
+    int_neighbours->this = new;
+    int_neighbours->next = aux;
 }
 
 int main(int argc, char *argv[])
@@ -93,22 +94,24 @@ int main(int argc, char *argv[])
     // TWONODES no caso em que a rede tem dois nós
     // MANYNODES no caso em que a rede tem mais que dois nós
     enum {NONODES, ONENODE, TWONODES, MANYNODES} network_state;
-    state = NONODES;
+    network_state = NONODES;
     node_list *nodes_fucking_list;
     fd_set rfds;
     int num_nodes, fd_udp, max_fd, counter, tcp_server_fd;
     int errcode;
     enum instr instr_code;
     char *user_input, flag, tcp_read_flag;
+    char command[150], arg1[150], arg2[150];
+    int word_count;
     char message_buffer[150], dgram[1000], *list_msg;
     struct addrinfo hints, *res;
     socklen_t addrlen;
-    struct sockaddr_in addr;
+    struct sockaddr addr;
     // potencialmente não será o vizinho externo
     // pode ser apenas um potencial vizinho externo,
     // no caso em que fazemos JOIN, fizemos ligação
     // mas ainda não recebemos a mensagem de contacto
-    viz *external, *new; 
+    viz *external, *new, *backup=safeMalloc(sizeof(viz)); 
     // lista de vizinhos internos
     internals *int_neighbours = NULL, *aux;
     //cache_objects cache[N];
@@ -161,7 +164,7 @@ int main(int argc, char *argv[])
         {
 
             FD_SET(external->fd, &rfds);
-            aux = neighbours;
+            aux = int_neighbours;
             while (aux != NULL)
             {
                 FD_SET(aux->this->fd, &rfds);
@@ -205,7 +208,7 @@ int main(int argc, char *argv[])
             } 
             // se este processo estava em modo TWONODES ou MANYNODES, alguém que nos contacta
             // será mais um vizinho interno
-            else if (network_state == TWONODES || network_state == MANY_NODES)
+            else if (network_state == TWONODES || network_state == MANYNODES)
             {
                 errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -233,11 +236,11 @@ int main(int argc, char *argv[])
                     // adicionar aqui a verificação do sscanf e errno e assim
 
                     // este é o caso em que nós fizemos connect e enviámos o NEW
-                    if (!strcmp(command, "EXTERN") && word_count == 3 && tcp_state = waiting_for_backup)
+                    if (!strcmp(command, "EXTERN") && word_count == 3 && tcp_state == waiting_for_backup)
                     {
                         printf("Just received the backup data\n");
-                        strncpy(backup.IP, arg1, NI_MAXHOST);
-                        strncpy(backup.port, arg2, NI_MAXSERV);
+                        strncpy(backup->IP, arg1, NI_MAXHOST);
+                        strncpy(backup->port, arg2, NI_MAXSERV);
                     }
                     // este é o caso em que recebemos connect, e enviámos EXTERN, mas 
                     // estávamos sozinhos na rede, então o nosso vizinho externo foi
@@ -252,11 +255,11 @@ int main(int argc, char *argv[])
             }
         }
         // mudar isto tudo
-        aux = neighbours;
+        aux = int_neighbours;
         while (aux != NULL)
         {
             // de momento de um vizinho interno só recebemos o new
-            if (FD_ISSET(aux->this->fd))
+            if (FD_ISSET(aux->this->fd, &rfds))
             {
                 if ((tcp_read_flag = readTCP(aux->this)) == MSG_FINISH)
                 {
@@ -375,7 +378,7 @@ int main(int argc, char *argv[])
         if (FD_ISSET(STDIN_FILENO, &rfds))
         {
             user_input = readCommand(&instr_code);
-            if (instr_code == JOIN_ID && state == NONODES)
+            if (instr_code == JOIN_ID && network_state == NONODES)
             {
                 if(sscanf(user_input,"%u %d",&self.net,&self.id) != 2)
                 {
@@ -400,7 +403,7 @@ int main(int argc, char *argv[])
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in JOIN UDP message send\n");
                 udp_state = waiting_for_list;
             }
-            else if (instr_code == LEAVE && state != NONODES)
+            else if (instr_code == LEAVE && network_state != NONODES)
             {
                 // criar string para enviar o desregisto (?isto é uma palavra) do nó
                 errcode = snprintf(message_buffer, 150, "UNREG %u %s %s", self.net, self.IP, self.port);  
@@ -412,7 +415,7 @@ int main(int argc, char *argv[])
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in UNREG UDP message send\n");
                 udp_state = waiting_for_unregok;
             }
-            else if (instr_code == CREATE && state != NONODES)
+            else if (instr_code == CREATE && network_state != NONODES)
                 head = createinsertObject(head,user_input,str_id);
             else if(instr_code == EXIT)
                 exit(0);

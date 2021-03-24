@@ -1,5 +1,10 @@
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include "tcp.h"
-
+#include "errcheck.h"
 char writeTCP(int fd, ssize_t nleft, char *buffer)
 {
   ssize_t nwritten;
