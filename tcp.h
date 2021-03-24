@@ -1,3 +1,7 @@
+#define MSG_PARTIAL 0
+#define MSG_FINISH 1
+#define MSG_ERROR 2
+
 // estrutura para criar uma lista das diferentes 
 // mensagens lidas numa chamada de sistema read
 typedef struct messages{
@@ -32,11 +36,5 @@ messages* messagesAlloc(void);
 messages *processReadTCP(viz *sender, ssize_t start_ix);
 
 
-typedef struct stream{
-  int fd; // file descriptor da stream
-  char buffer[N_MAX+1]; // buffer que guarda os caracteres da stream
-  // proximo indice de buffer onde podemos colocar um caractere. Fica com 
-  // este tipo porque entra para os calculos do argumento do read
-  ssize_t next_av_ix; 
-} stream;
+void freeMessage(messages *msg);
  

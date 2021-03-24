@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     int num_nodes, fd_udp, max_fd, counter, tcp_server_fd;
     int errcode;
     enum instr instr_code;
-    char *user_input, flag;
+    char *user_input, flag, tcp_read_flag;
     char message_buffer[150], dgram[1000], *list_msg;
     struct addrinfo hints, *res;
     socklen_t addrlen;
@@ -115,6 +115,8 @@ int main(int argc, char *argv[])
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
     enum {waiting_for_backup} tcp_state;
+    // lista de mensagens recebidas num readTCP
+    messages *msg_list;
     no self;
     list_objects *head = NULL;
     char *str_id;
@@ -177,21 +179,13 @@ int main(int argc, char *argv[])
         if (FD_ISSET(tcp_server_fd, &rfds))
         {
             new = safeMalloc(sizeof(viz));
+            new->next_av_ix = 0;
             addrlen = sizeof(addr);
             if ((new->fd = accept(tcp_server_fd, &addr, &addrlen)) == -1)
             {
                 fprintf(stderr, "Error accepting new TCP connection: %s\n", strerror(errno));
                 exit(EXIT_FAILURE);
             }
-            // agora temos de descobrir qual o IP e o porto do tipo do outro lado
-            // adaptado do exemplo da manpage do getnameinfo e dos slides ( onde não aparecia 
-            // como selecionar as flags para dar o IP em números garantidamente)
-            // repara que meto o IP e o porto diretamente na estrutura do novo vizinho
-            if ((errcode = getnameinfo(addr, addrlen, new->IP, sizeof(new->IP), new->port, sizeof(new->port), NI_NUMERICHOST | NI_NUMERICSERV)))
-            {
-                fprintf(stderr, "error getting IP and port of new TCP connection: %s\n", gai_strerror(errcode));
-                exit(EXIT_FAILURE);
-            } 
             // se este processo estava em modo ONENODE, o primeiro tipo que nos contactar
             // será o nosso vizinho externo
             if (network_state == ONENODE)
@@ -229,7 +223,61 @@ int main(int argc, char *argv[])
         }
         if (FD_ISSET(external->fd, &rfds))
         {
-            // receber o extern
+            // nesta altura podemos receber ou o EXTERN ou o NEW
+            if ((tcp_read_flag = readTCP(external)) == MSG_FINISH)
+            {
+                msg_list = processReadTCP(external, 0);
+                while (msg_list != NULL)
+                {
+                    word_count = sscanf(msg_list->message, "%s %s %s\n", command, arg1, arg2);
+                    // adicionar aqui a verificação do sscanf e errno e assim
+
+                    // este é o caso em que nós fizemos connect e enviámos o NEW
+                    if (!strcmp(command, "EXTERN") && word_count == 3 && tcp_state = waiting_for_backup)
+                    {
+                        printf("Just received the backup data\n");
+                        strncpy(backup.IP, arg1, NI_MAXHOST);
+                        strncpy(backup.port, arg2, NI_MAXSERV);
+                    }
+                    // este é o caso em que recebemos connect, e enviámos EXTERN, mas 
+                    // estávamos sozinhos na rede, então o nosso vizinho externo foi
+                    // o tipo que fez o connect e ele envia-nos o NEW
+                    if (!strcmp(command, "NEW") && word_count == 3)
+                    {
+                        printf("Just received our newly arrived external's data\n");
+                        strncpy(external->IP, arg1, NI_MAXHOST);
+                        strncpy(external->port, arg2, NI_MAXSERV);
+                    }
+                }
+            }
+        }
+        // mudar isto tudo
+        aux = neighbours;
+        while (aux != NULL)
+        {
+            // de momento de um vizinho interno só recebemos o new
+            if (FD_ISSET(aux->this->fd))
+            {
+                if ((tcp_read_flag = readTCP(aux->this)) == MSG_FINISH)
+                {
+                    msg_list = processReadTCP(external, 0);
+                    while (msg_list != NULL)
+                    {
+                        word_count = sscanf(msg_list->message, "%s %s %s\n", command, arg1, arg2);
+                        // adicionar aqui a verificação do sscanf e errno e assim
+                       
+                        // este é o caso em que já tinhamos vizinho externo e recebemos
+                        // um novo vizinho que fez connect para nos e enviou o NEW
+                        if (!strcmp(command, "NEW") && word_count == 3)
+                        {
+                            printf("Just received our newly arrived internal's data\n");
+                            strncpy(aux->this->IP, arg1, NI_MAXHOST);
+                            strncpy(aux->this->port, arg2, NI_MAXSERV);
+                        }
+                    }
+                }
+            }
+
         }
         // UDP
         if (FD_ISSET(fd_udp, &rfds))
@@ -285,10 +333,20 @@ int main(int argc, char *argv[])
                         safeTCPSocket(&(external->fd));
                         connectTCP(nodes_fucking_list->IP, nodes_fucking_list->port, external->fd, 
                                 "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
+
                         tcp_state = waiting_for_backup; // we're outnumbered, need backup
                         network_state = TWONODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                         // quer dizer, podemos ver pelo num_nodes na verdade
                         
+                        // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
+                        errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+                            fprintf(stderr, "error in NEW TCP message creation: %s\n", strerror(errno));
+                            exit(-1);
+                        }
+                        
+                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
                         // acabar de preencher a informação do external
                         strncpy(external->IP, nodes_fucking_list->IP, NI_MAXHOST);
                         strncpy(external->port, nodes_fucking_list->port, NI_MAXSERV);
