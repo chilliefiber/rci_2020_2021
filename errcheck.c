@@ -94,7 +94,7 @@ void safeTCPSocket(int* fd)
 }
 
 
-void connectTCP(char *ip, char* port, int fd, int mode, char *addrinfo_error_msg, char *connect_error_msg)
+void connectTCP(char *ip, char* port, int fd, char *addrinfo_error_msg, char *connect_error_msg)
 {
   struct addrinfo hints, *res;
   size_t n;
@@ -110,5 +110,5 @@ void connectTCP(char *ip, char* port, int fd, int mode, char *addrinfo_error_msg
     exit(EXIT_FAILURE);
   }
   freeaddrinfo(res);
-  return 1;
+  //return 1;
 }
