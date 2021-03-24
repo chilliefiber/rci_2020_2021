@@ -1,0 +1,24 @@
+DUVIDAS A CODAR
+1 - mostrar aquilo que está no recursive cenas acerca do sscanf. Basicamente, podemos ignorar esses inputs mal formatados?
+2 - o que fazer caso, quando estamos a fazer join, o no que escolhemos para nos ligarmos de entre a lista recebida nao aceita o connect? De momento o nosso programa dá exit, é suposto tentarmos com outros?
+3 - No listen, quão grande deve ser o backlog?
+4 - Atenção à questão de passar um vizinho interno para externo: a memoria do vizinho interno de momento esta a ser dinamicamente alocada, o vizinho externo está na stack
+5 - Em relação a não colocar o servidor TCP e o udp_fd no select quando não é necessário provavelmente aquilo dá barraca. Melhor será receber e ignorar nesses casos
+6 - Tenho duvidas que o estado TWONODES seja necessairo
+
+1 - Encaminhamento nó entra na rede ou recupera da saida de outro no, criar novas arestas? Mas talvez nao seja absolutamente necessario faze lo, por exemplo no slide 7 da apresentação ha uma quebra de ligaçao, mas nao vamos fazer ligaçoes novas. Parece me que so fazemos ligaçoes novas quando perdemos o vizinho externo, em que pedimos um backup novo
+
+2 - Nao esta explicitado o que acontece quando um no perde o backup
+
+3 - Podemos ter um numero indefinido de objetos associados ao nosso nome, mas apenas 2 objetos de outros nos?
+
+DUVIDAS NA PESQUISA DE OBJETO
+
+1 - Ao pesquisar um objeto do ponto de vista do nó que inicia a busca, o que acontece caso o utilizador inicie 2 buscas de seguida para o mesmo objeto sem receber resposta da primeira? Caso seja uma rede de latencia baixa isto é irrelevante porque em principio chega a resposta antes do utilizador escrever o pedido seguinte. Temos de nos preocupar com isto?
+
+
+2 - O que acontece quando um nó intermédio recebe 2 pedidos de seguida para o mesmo objeto, vindos de 2 vizinhos diferentes. Eu diria que podemos nao difundir 2 mensagens de interesse, simplesmente adicionamos à estrutura de nos que procuraram esse objeto o 2º no que pediu e depois enviamos para ambos ao receber DATA/NODATA. Temos de nos preocupar com isto, latencia baixa etc
+
+
+
+

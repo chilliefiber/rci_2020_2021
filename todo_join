@@ -1,0 +1,18 @@
+Para fazer o join:
+1 - Nó entrante seleciona um nó e estabelece contacto (feito). 
+1a - Nó entrante coloca o nó selecionado como vizinho externo (feito)
+1b - Nó entrante vai para o estado waiting_for_extern (feito)
+
+2- Nó selecionado aceita a conexão e envia EXTERN
+2a - criar servidor TCP (feito)
+2b - adicionar servidor TCP (inicio do programa) e vizinho externo (no caso em que não estamos ONENODE/NONODES) à lista de fds a settar (feito)
+2c - Ao receber um pedido de contacto, enviar EXTERN. Caso estejamos ONENODE, colocar o bacano que nos contactou como nosso vizinho externo e passar a TWONODES. Caso contrário, adicionar o bacano que nos contactou à lista de vizinhos internos. Depois enviar o IP/port do nosso externo (feito)
+3 - Nó entrante coloca o extern como backup. Caso o backup seja o proprio entrante, colocar no estado TWONODES. Caso o backup seja diferente do entrante, colocar no estado MANYNODES
+3a - Registar o nó entrante no servidor de nós. É copia/cola do que já se faz no caso em que list_msg == NULL
+
+A FAZER 
+Fazer o 3 no FD_ISSET do external->fd. Para isso, ler o codigo daqueles available ix da stream e provavelmente concluir a inicialização dos viz colocando esses ssize_t com os valores correto (vai ser 0, mas não o coloques sem reler o código)
+
+NOTA
+Tirar o strncpy/snprintf com errno, isos nao se usa
+
