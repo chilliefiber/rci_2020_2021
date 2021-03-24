@@ -38,12 +38,6 @@ typedef struct no{
     struct viz *backup; //Ponteiro para vizinho de recuperação
 }no;
 
-typedef struct viz{
-    int fd; //file descriptor 
-    int id;    //identificador do vizinho
-    char IP[INET_ADDRSTRLEN]; //endereço IP do vizinho
-    char port[NI_MAXSERV]; //Porto TCP do vizinho
-}viz;
 
 //lista dos vizinhos internos do nó
 typedef struct internals{
@@ -84,6 +78,14 @@ list_objects *createinsertObject(list_objects *head, char *subname, char *str_id
     return head;
 }
 
+void addToList(internals * interns, viz *new)
+{
+    internals *aux = *intern;
+    *interns = safeMalloc(sizeof(internals));
+    *interns->viz = new;
+    *interns->next = aux;
+}
+
 int main(int argc, char *argv[])
 {
     // enum dos vários estados associados à rede de nós
@@ -106,9 +108,9 @@ int main(int argc, char *argv[])
     // pode ser apenas um potencial vizinho externo,
     // no caso em que fazemos JOIN, fizemos ligação
     // mas ainda não recebemos a mensagem de contacto
-    viz external; 
+    viz *external, *new; 
     // lista de vizinhos internos
-    internals *neighbours = NULL, *aux;
+    internals *int_neighbours = NULL, *aux;
     //cache_objects cache[N];
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
@@ -156,11 +158,11 @@ int main(int argc, char *argv[])
         if (network_state != NONODES && network_state != ONENODE)
         {
 
-            FD_SET(external.fd, &rfds);
+            FD_SET(external->fd, &rfds);
             aux = neighbours;
             while (aux != NULL)
             {
-                FD_SET(aux->this.fd, &rfds);
+                FD_SET(aux->this->fd, &rfds);
                 aux = aux->next;
             }
         }
@@ -174,12 +176,60 @@ int main(int argc, char *argv[])
         // TCP
         if (FD_ISSET(tcp_server_fd, &rfds))
         {
+            new = safeMalloc(sizeof(viz));
             addrlen = sizeof(addr);
+            if ((new->fd = accept(tcp_server_fd, &addr, &addrlen)) == -1)
+            {
+                fprintf(stderr, "Error accepting new TCP connection: %s\n", strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            // agora temos de descobrir qual o IP e o porto do tipo do outro lado
+            // adaptado do exemplo da manpage do getnameinfo e dos slides ( onde não aparecia 
+            // como selecionar as flags para dar o IP em números garantidamente)
+            // repara que meto o IP e o porto diretamente na estrutura do novo vizinho
+            if ((errcode = getnameinfo(addr, addrlen, new->IP, sizeof(new->IP), new->port, sizeof(new->port), NI_NUMERICHOST | NI_NUMERICSERV)))
+            {
+                fprintf(stderr, "error getting IP and port of new TCP connection: %s\n", gai_strerror(errcode));
+                exit(EXIT_FAILURE);
+            } 
             // se este processo estava em modo ONENODE, o primeiro tipo que nos contactar
             // será o nosso vizinho externo
-            
+            if (network_state == ONENODE)
+            {
+                external = new;
+                new = NULL;
+                errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
+                if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                {
+                    // isto tá mal, o strncpy não afeta o errno!!
+                    // deixo por agora para me lembrar de mudar em todos
+                    fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                    exit(-1);
+                }
+                writeTCP(external->fd, strlen(message_buffer), message_buffer);
+                network_state = TWONODES;
+            } 
             // se este processo estava em modo TWONODES ou MANYNODES, alguém que nos contacta
             // será mais um vizinho interno
+            else if (network_state == TWONODES || network_state == MANY_NODES)
+            {
+                errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
+                if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                {
+                    // isto tá mal, o strncpy não afeta o errno!!
+                    // deixo por agora para me lembrar de mudar em todos
+                    fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                    exit(-1);
+                }
+                writeTCP(new->fd, strlen(message_buffer), message_buffer);
+                network_state = MANYNODES;
+                addToList(int_neighbours, new);
+                new = NULL;
+            }
+        }
+        if (FD_ISSET(external->fd, &rfds))
+        {
+            // receber o extern
         }
         // UDP
         if (FD_ISSET(fd_udp, &rfds))
@@ -232,10 +282,16 @@ int main(int argc, char *argv[])
                         // e portanto não precisamos mais dela
                         nodes_fucking_list = NULL;
                         parseNodeListRecursive(list_msg, &num_nodes, &nodes_fucking_list);
-                        safeTCPSocket(&(external.fd));
-                        connectTCP(nodes_fucking_list->IP, nodes_fucking_list->port, external.fd, 
+                        safeTCPSocket(&(external->fd));
+                        connectTCP(nodes_fucking_list->IP, nodes_fucking_list->port, external->fd, 
                                 "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
                         tcp_state = waiting_for_backup; // we're outnumbered, need backup
+                        network_state = TWONODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
+                        // quer dizer, podemos ver pelo num_nodes na verdade
+                        
+                        // acabar de preencher a informação do external
+                        strncpy(external->IP, nodes_fucking_list->IP, NI_MAXHOST);
+                        strncpy(external->port, nodes_fucking_list->port, NI_MAXSERV);
                     }
                     // neste caso a rede está vazia. O nó coloca-se no estado single_node e regista-se diretamente
                     // no servidor de nós
