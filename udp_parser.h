@@ -5,7 +5,7 @@
 #include <netdb.h>
 
 typedef struct node_list{
-    char IP[INET_ADDRSTRLEN]; //endereço IP do nó	
+    char IP[NI_MAXHOST]; //endereço IP do nó	
     char port[NI_MAXSERV]; //Porto TCP do nó
     struct node_list *next;
 } node_list;

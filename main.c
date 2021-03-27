@@ -33,7 +33,7 @@ typedef struct no{
     unsigned int net; //identificador da rede
     object *conj_objects; //conjunto de objetos nomeados contidos num nó
     int id;    //identificador do nó
-    char IP[INET_ADDRSTRLEN]; //endereço IP do nó
+    char IP[NI_MAXHOST]; //endereço IP do nó
     char port[NI_MAXSERV]; //Porto TCP do nó
     struct viz *externo; //Ponteiro para vizinho externo
     struct viz *backup; //Ponteiro para vizinho de recuperação
@@ -111,15 +111,16 @@ int main(int argc, char *argv[])
     // pode ser apenas um potencial vizinho externo,
     // no caso em que fazemos JOIN, fizemos ligação
     // mas ainda não recebemos a mensagem de contacto
-    viz *external, *new, *backup=safeMalloc(sizeof(viz)); 
+    viz *external=NULL, *new=NULL, *backup=safeMalloc(sizeof(viz)); 
     // lista de vizinhos internos
-    internals *int_neighbours = NULL, *aux;
+    internals *int_neighbours = NULL, *neigh_aux;
     //cache_objects cache[N];
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
+    udp_state = not_waiting;
     enum {waiting_for_backup} tcp_state;
     // lista de mensagens recebidas num readTCP
-    messages *msg_list;
+    messages *msg_list, *msg_aux;
     no self;
     list_objects *head = NULL;
     char *str_id;
@@ -157,24 +158,25 @@ int main(int argc, char *argv[])
     {
         // initialize file descriptor set
         FD_ZERO(&rfds);
-        // se o processo não está em nenhuma rede, não é suposto contactarem nos por TCP
-        if (network_state != NONODES)
-            FD_SET(tcp_server_fd, &rfds); 
-        if (network_state != NONODES && network_state != ONENODE)
-        {
 
-            FD_SET(external->fd, &rfds);
-            aux = int_neighbours;
-            while (aux != NULL)
-            {
-                FD_SET(aux->this->fd, &rfds);
-                aux = aux->next;
-            }
-        }
-        if (udp_state != not_waiting)
-            FD_SET(fd_udp, &rfds);
+        FD_SET(fd_udp, &rfds);
         FD_SET(STDIN_FILENO, &rfds);
         max_fd=max(STDIN_FILENO, fd_udp);
+        // se o processo não está em nenhuma rede, não é suposto contactarem nos por TCP
+        FD_SET(tcp_server_fd, &rfds); 
+        max_fd = max(max_fd, tcp_server_fd);
+        if (external)
+        {
+            FD_SET(external->fd, &rfds);
+            max_fd = max(max_fd, external->fd);
+        }
+        neigh_aux = int_neighbours;
+        while (neigh_aux != NULL)
+        {
+            FD_SET(neigh_aux->this->fd, &rfds);
+            max_fd = max(max_fd, neigh_aux->this->fd);
+            neigh_aux = neigh_aux->next;
+        }
         // select upon which file descriptor to act 
         counter = select(max_fd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         if(counter<=0)  exit(1);
@@ -189,22 +191,23 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Error accepting new TCP connection: %s\n", strerror(errno));
                 exit(EXIT_FAILURE);
             }
+
+            // se este processo estava em modo NONODES, ninguém nos deve contactar por TCP
+            // porque não estamos ligados a qualquer rede
+            if (network_state == NONODES)
+            {
+                close(new->fd);
+                free(new);
+                new = NULL;
+            }
             // se este processo estava em modo ONENODE, o primeiro tipo que nos contactar
             // será o nosso vizinho externo
-            if (network_state == ONENODE)
+            // Neste caso, apenas aceitamos a conexão e estabelecemos o fd do vizinho externo.
+            // Ficamos à espera que ele nos envie o NEW para lhe devolvermos o EXTERN
+            else if (network_state == ONENODE)
             {
                 external = new;
                 new = NULL;
-                errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
-                if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-                {
-                    // isto tá mal, o strncpy não afeta o errno!!
-                    // deixo por agora para me lembrar de mudar em todos
-                    fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
-                    exit(-1);
-                }
-                writeTCP(external->fd, strlen(message_buffer), message_buffer);
-                network_state = TWONODES;
             } 
             // se este processo estava em modo TWONODES ou MANYNODES, alguém que nos contacta
             // será mais um vizinho interno
@@ -221,10 +224,20 @@ int main(int argc, char *argv[])
                 writeTCP(new->fd, strlen(message_buffer), message_buffer);
                 network_state = MANYNODES;
                 addToList(int_neighbours, new);
+                new = NULL; // possivelmente passar esta linha de código para o fim de todas as condições
+            }
+            // não é suposto acontecer alguma vez estas 2 condições
+            // isto está aqui apenas por motivos de debug, caso haja alguma falha na máquina de estados
+            else
+                printf("Error in finite state machine: network_state CODE 1\n");
+            if (new != NULL)
+            {
+                printf("Error in finite state machine: network_state CODE 2\n");
+                free(new);
                 new = NULL;
             }
         }
-        if (FD_ISSET(external->fd, &rfds))
+        if (external && FD_ISSET(external->fd, &rfds))
         {
             // nesta altura podemos receber ou o EXTERN ou o NEW
             if ((tcp_read_flag = readTCP(external)) == MSG_FINISH)
@@ -236,36 +249,67 @@ int main(int argc, char *argv[])
                     // adicionar aqui a verificação do sscanf e errno e assim
 
                     // este é o caso em que nós fizemos connect e enviámos o NEW
+                    // vamos armazenar a informação do nosso backup e registar os nossos
+                    // dados no servidor de nós
                     if (!strcmp(command, "EXTERN") && word_count == 3 && tcp_state == waiting_for_backup)
                     {
                         printf("Just received the backup data\n");
                         strncpy(backup->IP, arg1, NI_MAXHOST);
                         strncpy(backup->port, arg2, NI_MAXSERV);
+
+                        // criar string para enviar o registo do nó
+                        errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.IP, self.port);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+                            fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
+                            exit(-1);
+                        }
+                        sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
+                        udp_state = waiting_for_regok;
+                        // deviamos colocar aqui o two nodes/many nodes
                     }
-                    // este é o caso em que recebemos connect, e enviámos EXTERN, mas 
+                    // este é o caso em que recebemos connect, mas 
                     // estávamos sozinhos na rede, então o nosso vizinho externo foi
-                    // o tipo que fez o connect e ele envia-nos o NEW
+                    // o tipo que fez o connect e ele envia-nos o NEW. Com a informação
+                    // recebida no new, vamos poder retribuir o EXTERN
                     if (!strcmp(command, "NEW") && word_count == 3)
                     {
                         printf("Just received our newly arrived external's data\n");
                         strncpy(external->IP, arg1, NI_MAXHOST);
                         strncpy(external->port, arg2, NI_MAXSERV);
+
+                        errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+                            // isto tá mal, o strncpy não afeta o errno!!
+                            // deixo por agora para me lembrar de mudar em todos
+                            fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                            exit(-1);
+                        }
+                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
+                        network_state = TWONODES;
                     }
+                    msg_aux = msg_list;
+                    msg_list = msg_list->next;
+                    free(msg_aux->message)
+                    free(msg_aux);
+                    msg_aux = NULL;
                 }
             }
         }
         // mudar isto tudo
-        aux = int_neighbours;
-        while (aux != NULL)
+        neigh_aux = int_neighbours;
+        while (neigh_aux != NULL)
         {
             // de momento de um vizinho interno só recebemos o new
-            if (FD_ISSET(aux->this->fd, &rfds))
+            if (FD_ISSET(neigh_aux->this->fd, &rfds))
             {
-                if ((tcp_read_flag = readTCP(aux->this)) == MSG_FINISH)
+                if ((tcp_read_flag = readTCP(neigh_aux->this)) == MSG_FINISH)
                 {
                     msg_list = processReadTCP(external, 0);
                     while (msg_list != NULL)
                     {
+                        // adicionar aqui o argumento de lixo extra
                         word_count = sscanf(msg_list->message, "%s %s %s\n", command, arg1, arg2);
                         // adicionar aqui a verificação do sscanf e errno e assim
                        
@@ -274,13 +318,12 @@ int main(int argc, char *argv[])
                         if (!strcmp(command, "NEW") && word_count == 3)
                         {
                             printf("Just received our newly arrived internal's data\n");
-                            strncpy(aux->this->IP, arg1, NI_MAXHOST);
-                            strncpy(aux->this->port, arg2, NI_MAXSERV);
+                            strncpy(neigh_aux->this->IP, arg1, NI_MAXHOST);
+                            strncpy(neigh_aux->this->port, arg2, NI_MAXSERV);
                         }
                     }
                 }
             }
-
         }
         // UDP
         if (FD_ISSET(fd_udp, &rfds))
@@ -293,7 +336,15 @@ int main(int argc, char *argv[])
                 if (!strcmp(dgram, "OKREG")){
                     printf("We received the confirmation of registration from the server\n");
                     udp_state = not_waiting;
-                    network_state = TWONODES; //isto so para ser diferente de NONODESde momento
+                    if (external)
+                        network_state = TWONODES; // aqui tem de perceber se está TWONODES ou MANYNODES. Pode ser pelo num_nodes 
+                    // ou olhando para o backup. Importante que podemos estar twonodes e na verdade haver mais, porque ao entrar
+                    // se so estiver la um no ficamos twonodes, e depois ao entrar 1 terceiro no que fica vizinho interno do
+                    // nó inicial não vamos saber dele. No entanto, quando tivermos a tabela de encaminhamento feita
+                    // podemos ver pelo numero de entradas que temos o numero de nos na rede, visto que vamos ter exatamente uma
+                    // entrada por cada no na rede
+                    else
+                        network_state = ONENODE;
                 }
                 else
                     warnOfTrashReceived("WARNING - Received trash through UDP: udp_state waiting_for_regok\n", dgram);
@@ -333,6 +384,8 @@ int main(int argc, char *argv[])
                         // e portanto não precisamos mais dela
                         nodes_fucking_list = NULL;
                         parseNodeListRecursive(list_msg, &num_nodes, &nodes_fucking_list);
+                        external = safeMalloc(sizeof(viz));
+                        external->next_av_ix = 0;
                         safeTCPSocket(&(external->fd));
                         connectTCP(nodes_fucking_list->IP, nodes_fucking_list->port, external->fd, 
                                 "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
@@ -348,7 +401,6 @@ int main(int argc, char *argv[])
                             fprintf(stderr, "error in NEW TCP message creation: %s\n", strerror(errno));
                             exit(-1);
                         }
-                        
                         writeTCP(external->fd, strlen(message_buffer), message_buffer);
                         // acabar de preencher a informação do external
                         strncpy(external->IP, nodes_fucking_list->IP, NI_MAXHOST);
@@ -414,6 +466,13 @@ int main(int argc, char *argv[])
                 }
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in UNREG UDP message send\n");
                 udp_state = waiting_for_unregok;
+                while (int_neighbours)
+                {
+                    neigh_aux = int_neighbours;
+                    int_neighbours = int_neighbours->next;
+                    free(neigh_aux);
+                    neigh_aux = NULL;
+                }
             }
             else if (instr_code == CREATE && network_state != NONODES)
                 head = createinsertObject(head,user_input,str_id);

@@ -47,7 +47,7 @@ char* getParam(char *input)
 
 char *readCommand(enum instr *instr_code)
 {
-	char terminal[128], command[14], bootIP[INET_ADDRSTRLEN], bootTCP[NI_MAXSERV], second[64], id[64];
+	char terminal[128], command[14], bootIP[NI_MAXHOST], bootTCP[NI_MAXSERV], second[64], id[64];
 	int size_input = 0;
 	
 	fgets(terminal,128,stdin);

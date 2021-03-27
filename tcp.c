@@ -5,18 +5,20 @@
 #include <netdb.h>
 #include "tcp.h"
 #include "errcheck.h"
+#include <stdio.h> // depois tirar este
 char writeTCP(int fd, ssize_t nleft, char *buffer)
 {
-  ssize_t nwritten;
+    fputs( "We're writing shit through TCP mudafucka\n",stdout);
+    ssize_t nwritten;
 
-  while(nleft>0){
-    nwritten = write(fd, buffer, nleft);
-    if (nwritten <= 0)
-      return 0;
-    nleft -= nwritten;
-    buffer += nwritten;
-  }
-  return 1;
+    while(nleft>0){
+        nwritten = write(fd, buffer, nleft);
+        if (nwritten <= 0)
+            return 0;
+        nleft -= nwritten;
+        buffer += nwritten;
+    }
+    return 1;
 }
 
 

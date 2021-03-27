@@ -14,7 +14,7 @@ typedef struct messages{
 
 typedef struct viz{
     int fd; //file descriptor associado à conexão com o vizinho 
-    char IP[INET_ADDRSTRLEN]; //endereço IP do vizinho
+    char IP[NI_MAXHOST]; //endereço IP do vizinho
     char port[NI_MAXSERV]; //Porto TCP do vizinho
     char buffer[N_MAX+1]; // buffer que guarda os caracteres da stream
     // proximo indice de buffer onde podemos colocar um caractere. Fica com 
