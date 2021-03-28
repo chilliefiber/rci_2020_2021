@@ -1,8 +1,10 @@
 #ifndef TCP_H_CONST
 #define TCP_H_CONST
-#define MSG_PARTIAL 0
-#define MSG_FINISH 1
-#define MSG_ERROR 2
+#define MSG_PARTIAL 0 // indica que recebemos via TCP texto mas que não recebemos nenhum \n
+#define MSG_FINISH 1 // indica que recebemos via TCP texto e que recebemos pelo menos 1 \n
+#define MSG_READ_ERROR 2 // indica que houve um erro no read
+#define MSG_CLOSED 3 // indica que o read() devolveu 0, logo fecharam a conexão ordeiramente
+#define MSG_FORMAT_ERROR 4 // indica que o tipo que nos está a enviar texto excedeu o tamanho limite de uma mensagem sem enviar o \n
 #define N_MAX 150
 
 // estrutura para criar uma lista das diferentes 

@@ -1,0 +1,40 @@
+// FD_ISSET(external->fd)
+if (tcp_read_flag == MSG_CLOSED)
+    por cada elemento da tabela de encaminhamento:
+        se elemento.fd == external->fd{
+            para cada ligação tcp ativa: // como foi o externo que saiu, iterar pelos vizinhos internos
+                enviar WITHDRAW elemento.id 
+            apagar elemento da tabela de encaminhamento
+        }
+
+
+-----------------------------
+
+// FD_ISSET(aux_neigh->this->fd)
+if (tcp_read_flag == MSG_CLOSED)
+    por cada elemento da tabela de encaminhamento:
+        se elemento.fd == external->fd{
+            para cada ligação tcp ativa: // como foi um interno que saiu, iterar pelos vizinhos internos (ignorando o que saiu) e depois da loop enviar para o externo tambem
+                enviar WITHDRAW elemento.id 
+            apagar elemento da tabela de encaminhamento
+        }
+
+
+-------------------------------------
+
+
+FD_ISSET (fd_x)
+    if (tcp_read_flag == MSG_FINISH)
+        processRead...
+        sscanf(message, "%s %s\n", command, arg1);
+        if (!strmcp(command, "ADVERTISE"))
+            por cada ligação tcp ativa, ignorando o fd_x: // se external->fd == fd_x, enviar para todos os internos. Se o fd_x era um interno, enviamos para todos os internos menos esse, e depois enviamos para o externo
+                enviar ADVERTISE igual ao recebido
+            adicionar à tabela de encaminhamento elemento novo
+                elementonovo.fd = fd_x;
+                elementonovo.id = arg1;
+                 
+
+if (inteiro) é verdade se o inteiro for diferente de 0, e falsa se o inteiro for 0
+
+if (ponteiro) <=> if (ponteiro != NULL)

@@ -84,7 +84,6 @@ char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
         if (c == '\n')
         {
             message_until_newline[ix+1] = '\0';
-            printf("%s\n", message_until_newline);
             // se a primeira linha lida foi a do comando recebemos a mensagem correta
             if (!(error_flag = strcmp(message_until_newline, message_supposed_to_recv))){
                 *nodeslist_received = 1;

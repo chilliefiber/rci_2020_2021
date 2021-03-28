@@ -31,12 +31,9 @@ typedef struct cache_objects{
 
 typedef struct no{
     unsigned int net; //identificador da rede
-    object *conj_objects; //conjunto de objetos nomeados contidos num nó
     int id;    //identificador do nó
     char IP[NI_MAXHOST]; //endereço IP do nó
     char port[NI_MAXSERV]; //Porto TCP do nó
-    struct viz *externo; //Ponteiro para vizinho externo
-    struct viz *backup; //Ponteiro para vizinho de recuperação
 }no;
 
 
@@ -310,7 +307,6 @@ int main(int argc, char *argv[])
             {
                 if ((tcp_read_flag = readTCP(neigh_aux->this)) == MSG_FINISH)
                 {
-                    printf("Recebemos uma mensagem completa\n");
                     msg_list = processReadTCP(neigh_aux->this, 0);
                     while (msg_list != NULL)
                     {
@@ -333,7 +329,6 @@ int main(int argc, char *argv[])
                         msg_aux = NULL;
                     }
                 }
-                printf("Este vizinho interno não está NULL\n");
             }
             neigh_aux = neigh_aux->next;
         }
@@ -485,8 +480,8 @@ int main(int argc, char *argv[])
                 {
                     neigh_aux = int_neighbours;
                     int_neighbours = int_neighbours->next;
+                    free(neigh_aux->this);
                     free(neigh_aux);
-                    printf("Badjoraz\n");
                     neigh_aux = NULL;
                 }
             }

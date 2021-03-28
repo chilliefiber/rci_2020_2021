@@ -77,6 +77,9 @@ char readTCP(viz* sender)
     // sender->next_av_ix é o proximo indice disponivel
     // da buffer desta stream
     // nao queremos escrever para la da stream, daí a subtração
+    //
+    // ter em atenção quando tiver menos sono, ver se há a possibilidade de N_MAX == sender->next_av_ix
+    // é que nesse caso o comportamento do read é esquisito. Possivelmente incluir uma verificação aqui
     if ((n_read=read(sender->fd, sender->buffer + sender->next_av_ix, N_MAX - sender->next_av_ix)) > 0){
         // verificamos se nos caracteres recebidos não estava um \n.
         // se estava, era o fim da mensagem se bem formatada.
@@ -89,14 +92,15 @@ char readTCP(viz* sender)
         // adicionamos o valor de caracteres lidos agora ao lido no total
         sender->next_av_ix += n_read;
     }
-    // se o read deu 0 ou -1, a conexão foi fechada ou caiu
-    else{
-        return MSG_ERROR;
-    }
+    else if (n_read == -1)
+        return MSG_READ_ERROR;
+    else if (!n_read)
+        return MSG_CLOSED;
     // se já lemos N_MAX caracteres e ainda não
     // recebemos uma \n, está a ocorrer um erro
+    // da parte do sender
     if (sender->next_av_ix == N_MAX && !message_end)
-        return MSG_ERROR;
+        return MSG_FORMAT_ERROR;
     if (message_end)
         return MSG_FINISH;
     return MSG_PARTIAL;
