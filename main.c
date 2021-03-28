@@ -79,12 +79,12 @@ list_objects *createinsertObject(list_objects *head, char *subname, char *str_id
     return head;
 }
 
-void addToList(internals *int_neighbours, viz *new)
+void addToList(internals **int_neighbours, viz *new)
 {
-    internals *aux = int_neighbours;
-    int_neighbours = safeMalloc(sizeof(internals));
-    int_neighbours->this = new;
-    int_neighbours->next = aux;
+    internals *aux = *int_neighbours;
+    *int_neighbours = safeMalloc(sizeof(internals));
+    (*int_neighbours)->this = new;
+    (*int_neighbours)->next = aux;
 }
 
 int main(int argc, char *argv[])
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     // pode ser apenas um potencial vizinho externo,
     // no caso em que fazemos JOIN, fizemos ligação
     // mas ainda não recebemos a mensagem de contacto
-    viz *external=NULL, *new=NULL, *backup=safeMalloc(sizeof(viz)); 
+    viz *external=NULL, *new=NULL, *backup=safeMalloc(sizeof(viz));
     // lista de vizinhos internos
     internals *int_neighbours = NULL, *neigh_aux;
     //cache_objects cache[N];
@@ -223,7 +223,7 @@ int main(int argc, char *argv[])
                 }
                 writeTCP(new->fd, strlen(message_buffer), message_buffer);
                 network_state = MANYNODES;
-                addToList(int_neighbours, new);
+                addToList(&int_neighbours, new);
                 new = NULL; // possivelmente passar esta linha de código para o fim de todas as condições
             }
             // não é suposto acontecer alguma vez estas 2 condições
@@ -256,7 +256,7 @@ int main(int argc, char *argv[])
                         printf("Just received the backup data\n");
                         strncpy(backup->IP, arg1, NI_MAXHOST);
                         strncpy(backup->port, arg2, NI_MAXSERV);
-
+                        printf("Acabámos de receber o extern\n");
                         // criar string para enviar o registo do nó
                         errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.IP, self.port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -266,7 +266,8 @@ int main(int argc, char *argv[])
                         }
                         sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
                         udp_state = waiting_for_regok;
-                        // deviamos colocar aqui o two nodes/many nodes
+                        printf("Acabámos de enviar o REG UDP\n");
+                        // deviamos colocar aqui a verificação se somos o nosso próprio backup ou nao, isto é two nodes vs many nodes
                     }
                     // este é o caso em que recebemos connect, mas 
                     // estávamos sozinhos na rede, então o nosso vizinho externo foi
@@ -288,10 +289,13 @@ int main(int argc, char *argv[])
                         }
                         writeTCP(external->fd, strlen(message_buffer), message_buffer);
                         network_state = TWONODES;
+                        // nesta situação, o nosso backup vamos ser nós próprios
+                        strncpy(backup->IP, argv[1], NI_MAXHOST); 
+                        strncpy(backup->port, argv[2], NI_MAXSERV);
                     }
                     msg_aux = msg_list;
                     msg_list = msg_list->next;
-                    free(msg_aux->message)
+                    free(msg_aux->message);
                     free(msg_aux);
                     msg_aux = NULL;
                 }
@@ -306,7 +310,8 @@ int main(int argc, char *argv[])
             {
                 if ((tcp_read_flag = readTCP(neigh_aux->this)) == MSG_FINISH)
                 {
-                    msg_list = processReadTCP(external, 0);
+                    printf("Recebemos uma mensagem completa\n");
+                    msg_list = processReadTCP(neigh_aux->this, 0);
                     while (msg_list != NULL)
                     {
                         // adicionar aqui o argumento de lixo extra
@@ -321,9 +326,16 @@ int main(int argc, char *argv[])
                             strncpy(neigh_aux->this->IP, arg1, NI_MAXHOST);
                             strncpy(neigh_aux->this->port, arg2, NI_MAXSERV);
                         }
+                        msg_aux = msg_list;
+                        msg_list = msg_list->next;
+                        free(msg_aux->message);
+                        free(msg_aux);
+                        msg_aux = NULL;
                     }
                 }
+                printf("Este vizinho interno não está NULL\n");
             }
+            neigh_aux = neigh_aux->next;
         }
         // UDP
         if (FD_ISSET(fd_udp, &rfds))
@@ -371,7 +383,6 @@ int main(int argc, char *argv[])
                     // assign a random node 
                     if (list_msg)
                     {
-
                         // ao receber a lista, vai selecionar um nó qualquer e ligar-se a ele
                         // de momento, liga-se ao último nó da lista enviada, que (da maneira que a lista é preenchida)
                         // é o primeiro nó da nodes_fucking_list
@@ -402,6 +413,9 @@ int main(int argc, char *argv[])
                             exit(-1);
                         }
                         writeTCP(external->fd, strlen(message_buffer), message_buffer);
+                        printf("Enviei o NEW\n");
+                        // aqui devíamos colocar um estado novo em que ficamos à espera do extern
+                        
                         // acabar de preencher a informação do external
                         strncpy(external->IP, nodes_fucking_list->IP, NI_MAXHOST);
                         strncpy(external->port, nodes_fucking_list->port, NI_MAXSERV);
@@ -466,11 +480,13 @@ int main(int argc, char *argv[])
                 }
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in UNREG UDP message send\n");
                 udp_state = waiting_for_unregok;
+                
                 while (int_neighbours)
                 {
                     neigh_aux = int_neighbours;
                     int_neighbours = int_neighbours->next;
                     free(neigh_aux);
+                    printf("Badjoraz\n");
                     neigh_aux = NULL;
                 }
             }
@@ -478,6 +494,34 @@ int main(int argc, char *argv[])
                 head = createinsertObject(head,user_input,str_id);
             else if(instr_code == EXIT)
                 exit(0);
+            else if(instr_code == ST)
+            {
+                if (network_state == NONODES)
+                    printf("We're not connected to any network\n");
+                else if (network_state == ONENODE)
+                    printf("We're alone in a network\n");
+                else if (network_state == TWONODES)
+                {
+                    printf("State is TWONODES\n");
+                    printf("Is internal_neighbours null: %s\n", int_neighbours?"no":"yes");
+                    printf("External neighbour's contact: %s:%s\n", external->IP, external->port);
+                    printf("Backup's contact: %s:%s\n", backup->IP, backup->port);
+                }
+                else if (network_state == MANYNODES)
+                {
+                    printf("State is MANYNODES\n");
+                    neigh_aux = int_neighbours;
+                    while (neigh_aux)
+                    {
+                        printf("Internal neighbour's contact: %s:%s\n", neigh_aux->this->IP, neigh_aux->this->port);
+                        neigh_aux = neigh_aux->next;
+                    }
+                    printf("External neighbour's contact: %s:%s\n", external->IP, external->port);
+                    printf("Backup's contact: %s:%s\n", backup->IP, backup->port);
+                }
+                else
+                    printf("Error in FSM: show topology\n");
+            }
             free(user_input);
         }
     }	
