@@ -48,6 +48,12 @@ char* getParam(char *input)
 char *readCommand(enum instr *instr_code)
 {
 	char terminal[128], command[14], bootIP[NI_MAXHOST], bootTCP[NI_MAXSERV], second[64], id[64];
+    memset(terminal, 0, 128);
+    memset(command, 0, 14);
+    memset(bootIP, 0, NI_MAXHOST);
+    memset(bootTCP, 0, NI_MAXSERV);
+    memset(second, 0, 64);
+    memset(id, 0, 64);
 	int size_input = 0;
 	
 	fgets(terminal,128,stdin);

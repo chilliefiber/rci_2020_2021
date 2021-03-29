@@ -1,0 +1,37 @@
+LEAVE FASE 2
+
+1 - Nó de saída desliga todas as conexões TCP (feito)
+2 - Nó de saída apaga o registo no servidor de nós (feito)
+3 - Nó que perdeu o vizinho externo vai buscar um novo vizinho externo
+3a - Nó que perdeu vizinho externo verifica se tem backup diferente dele próprio (feito)
+3aa - Nó que perdeu vizinho externo e tem backup liga-se ao backup, coloca o backup como vizinho externo, e pede um novo backup (feito)
+3ab -Nó que perdeu vizinho externo e não tem backup verifica se tem vizinhos internos
+3aba - Nó que perdeu vizinho externo, não tem backup nem internos entra em modo ONENODE
+3abb - Nó que perdeu vizinho externo,não tem backup mas tem interno(s) promove um interno E qq a vizinho externo. Mantém-se como seu próprio backup e notifica o interno E que o seu novo backup é o próprio E. Notifica também os outros internos que o seu novo backup será E
+3b - Nó que perdeu vizinho externo notifica os seus vizinhos internos do seu novo backup
+4 - Nós internos que não foram promovidos a externos são notificados da alteração do backup para E e atualizam o seu backup
+5 - Nó E que foi promovido a externo também atualiza o seu backup
+6 - Nó que perdeu vizinho interno apaga o da lista (feito)
+
+
+JOIN FASE 2
+
+Para fazer o join:
+1 - Nó entrante seleciona um nó e estabelece contacto (feito). 
+1a - Nó entrante coloca o nó selecionado como vizinho externo (feito)
+1b - Nó entrante vai para o estado waiting_for_extern (feito)
+
+2- Nó selecionado aceita a conexão e envia EXTERN 
+2a - criar servidor TCP (feito)
+2b - adicionar servidor TCP (inicio do programa) e vizinho externo (no caso em que não estamos ONENODE/NONODES) à lista de fds a settar (feito)
+2c - Ao receber um pedido de contacto, enviar EXTERN. Caso estejamos ONENODE, colocar o bacano que nos contactou como nosso vizinho externo e passar a TWONODES. Caso contrário, adicionar o bacano que nos contactou à lista de vizinhos internos. Depois enviar o IP/port do nosso externo (feito)
+3 - Nó entrante coloca o extern como backup. Caso o backup seja o proprio entrante, colocar no estado TWONODES. Caso o backup seja diferente do entrante, colocar no estado MANYNODES (feito)
+3a - Registar o nó entrante no servidor de nós. É copia/cola do que já se faz no caso em que list_msg == NULL (feito)
+
+A FAZER 
+Fazer uma funçao que inicialize o vizinho, nomeadamente o next_available_ix, e que meta o fd a -1 (CLOSED)
+
+NOTA
+Tirar o strncpy/snprintf com errno, isos nao se usa
+
+
