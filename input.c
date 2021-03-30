@@ -68,6 +68,12 @@ char *readCommand(enum instr *instr_code)
 	
 	if(strcmp("join",command) == 0)
 	{
+        // tirar este
+        if (size_input == 4)
+        {
+            *instr_code = JOIN_SERVER_DOWN;
+            return getParam(terminal);
+        } 
 		if(size_input == 3)
 		{
 			if(checkDigit(second) == 1 && checkDigit(id) == 1)

@@ -1,17 +1,26 @@
 LEAVE FASE 2
 
+Implementação:
 1 - Nó de saída desliga todas as conexões TCP (feito)
 2 - Nó de saída apaga o registo no servidor de nós (feito)
 3 - Nó que perdeu o vizinho externo vai buscar um novo vizinho externo
 3a - Nó que perdeu vizinho externo verifica se tem backup diferente dele próprio (feito)
 3aa - Nó que perdeu vizinho externo e tem backup liga-se ao backup, coloca o backup como vizinho externo, e pede um novo backup (feito)
-3ab -Nó que perdeu vizinho externo e não tem backup verifica se tem vizinhos internos
-3aba - Nó que perdeu vizinho externo, não tem backup nem internos entra em modo ONENODE
-3abb - Nó que perdeu vizinho externo,não tem backup mas tem interno(s) promove um interno E qq a vizinho externo. Mantém-se como seu próprio backup e notifica o interno E que o seu novo backup é o próprio E. Notifica também os outros internos que o seu novo backup será E
-3b - Nó que perdeu vizinho externo notifica os seus vizinhos internos do seu novo backup
-4 - Nós internos que não foram promovidos a externos são notificados da alteração do backup para E e atualizam o seu backup
-5 - Nó E que foi promovido a externo também atualiza o seu backup
+3ab -Nó que perdeu vizinho externo e não tem backup verifica se tem vizinhos internos (feito)
+3aba - Nó que perdeu vizinho externo, não tem backup nem internos entra em modo ONENODE (feito)
+3abb - Nó que perdeu vizinho externo,não tem backup mas tem interno(s) promove um interno “E” qq a vizinho externo. Mantém-se como seu próprio backup e notifica o interno “E” que o seu novo backup é o próprio E. Notifica também os outros internos que o seu novo backup será “E” (feito)
+3b - Nó que perdeu vizinho externo notifica os seus vizinhos internos do seu novo backup (feito)
+4 - Nós internos que não foram promovidos a externos são notificados da alteração do backup para “E” e atualizam o seu backup (feito)
+5 - Nó E que foi promovido a externo também atualiza o seu backup (feito)
 6 - Nó que perdeu vizinho interno apaga o da lista (feito)
+
+Testes:
+1- Há 2 nós apenas na rede. Um sai (funciona)
+2 - Há 3 nós na rede. Um dos nós que é o seu próprio backup perde o externo, e promove o interno a externo (funciona)
+3 - Há 3 nós na rede. Um dos nós que é o seu próprio backup perde o externo, e não tem internos. O interno do que saiu deve-se ligar ao backup (funciona)
+4 - Há 3 nós na rede. O nó que é vizinho interno do outro sai (funciona)
+5 - Há N>3 nós na rede. Nó que perdeu o vizinho externo era o seu próprio backup, não tinha vizinhos internos, mas o vizinho externo que saiu tinha muitos vizinhos internos (feito)
+6 …. (fazer novos testes, testar com servidor de nós)
 
 
 JOIN FASE 2
@@ -30,8 +39,9 @@ Para fazer o join:
 
 A FAZER 
 Fazer uma funçao que inicialize o vizinho, nomeadamente o next_available_ix, e que meta o fd a -1 (CLOSED)
-
+Passar tudo o que está dentro do select para um for_counter
 NOTA
 Tirar o strncpy/snprintf com errno, isos nao se usa
+Colocar o errno no sscanf, caso devolva EOF
 
 

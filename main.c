@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
     node_list *nodes_fucking_list;
     fd_set rfds;
     int num_nodes, fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0;
-    int errcode;
+    int errcode, external_is_filled;
     enum instr instr_code;
     char *user_input, flag, tcp_read_flag;
     char command[150], arg1[150], arg2[150];
@@ -180,6 +180,7 @@ int main(int argc, char *argv[])
         // TCP
         if (FD_ISSET(tcp_server_fd, &rfds))
         {
+            printf("New connection mudafucka\n");
             new = safeMalloc(sizeof(viz));
             new->next_av_ix = 0;
             addrlen = sizeof(addr);
@@ -193,6 +194,7 @@ int main(int argc, char *argv[])
             // porque não estamos ligados a qualquer rede
             if (network_state == NONODES)
             {
+                printf("Não estamos em nenhuma rede\n");
                 close(new->fd);
                 free(new);
                 new = NULL;
@@ -205,21 +207,33 @@ int main(int argc, char *argv[])
             {
                 external = new;
                 new = NULL;
+                printf("Estamos sozinhos numa rede\n");
+                network_state = TWONODES;
+                external_is_filled = 0;
+                // notar que apesar de estarmos em twonodes, não temos o external preenchido
+                // provavelmente temos de colocar aqui alguma flag acerca disso, nem que seja
+                // por causa do st, que vai ler do external que não está preenchido
             } 
             // se este processo estava em modo TWONODES ou MANYNODES, alguém que nos contacta
             // será mais um vizinho interno
             else if (network_state == TWONODES || network_state == MANYNODES)
             {
-                errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
-                if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                printf("Estamos numa rede com 2 ou mais nós. Alguém se ligou, vamos torná-lo um vizinho interno\n");
+                // isto é para o caso que está diretamente acima nos comentários, em que não temos os dados do external preenchidos
+                // depois enviamos o EXTERN para este interno quando FD_ISSET(external->fd) e recebermos o NEW
+                if (external_is_filled)
                 {
-                    // isto tá mal, o strncpy não afeta o errno!!
-                    // deixo por agora para me lembrar de mudar em todos
-                    fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
-                    exit(-1);
+                    errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
+                    if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                    {
+                        // isto tá mal, o strncpy não afeta o errno!!
+                        // deixo por agora para me lembrar de mudar em todos
+                        fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                        exit(-1);
+                    }
+                    writeTCP(new->fd, strlen(message_buffer), message_buffer);
+                    network_state = MANYNODES;
                 }
-                writeTCP(new->fd, strlen(message_buffer), message_buffer);
-                network_state = MANYNODES;
                 addToList(&int_neighbours, new);
                 new = NULL; // possivelmente passar esta linha de código para o fim de todas as condições
             }
@@ -244,26 +258,29 @@ int main(int argc, char *argv[])
                 {
                     word_count = sscanf(msg_list->message, "%s %s %s\n", command, arg1, arg2);
                     // adicionar aqui a verificação do sscanf e errno e assim
-
-                    // este é o caso em que nós fizemos connect e enviámos o NEW
-                    // vamos armazenar a informação do nosso backup e registar os nossos
-                    // dados no servidor de nós
+                    
+                    // sempre que recebemos EXTERN devemos atualizar a informação do nosso nó de backup
+                    // pode ser quando fizemos connect e enviámos o NEW ou quando o nosso vizinho de backup
+                    // fez leave e o nosso vizinho externo se ligou ao seu backup, atualizando o nosso backup
                     if (!strcmp(command, "EXTERN") && word_count == 3)
                     {
                         waiting_for_backup = 0;
                         printf("Just received the backup data\n");
                         strncpy(backup->IP, arg1, NI_MAXHOST);
                         strncpy(backup->port, arg2, NI_MAXSERV);
-                        printf("Acabámos de receber o extern\n");
-                        // criar string para enviar o registo do nó
-                        errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.IP, self.port);  
-                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-                        {
-                            fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
-                            exit(-1);
-                        }
                         if (!we_are_reg)
                         {
+                            // este é o caso em que nós fizemos connect e enviámos o NEW
+                            // vamos armazenar a informação do nosso backup e registar os nossos
+                            // dados no servidor de nós
+
+                            // criar string para enviar o registo do nó
+                            errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.IP, self.port);  
+                            if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                            {
+                                fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
+                                exit(-1);
+                            }
                             sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
                             udp_state = waiting_for_regok;
                             printf("Acabámos de enviar o REG UDP\n");
@@ -280,6 +297,7 @@ int main(int argc, char *argv[])
                         printf("Just received our newly arrived external's data\n");
                         strncpy(external->IP, arg1, NI_MAXHOST);
                         strncpy(external->port, arg2, NI_MAXSERV);
+                        external_is_filled = 1;
 
                         errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -290,10 +308,22 @@ int main(int argc, char *argv[])
                             exit(-1);
                         }
                         writeTCP(external->fd, strlen(message_buffer), message_buffer);
-                        network_state = TWONODES;
+                        network_state = MANYNODES; // em princípio este vai sair
                         // nesta situação, o nosso backup vamos ser nós próprios
                         strncpy(backup->IP, argv[1], NI_MAXHOST); 
                         strncpy(backup->port, argv[2], NI_MAXSERV);
+
+                        // enviar para todos os internos os dados do nosso vizinho externo
+                        // isto porque caso estivéssemos sozinhos na rede e de repente se ligaram 
+                        // vários gajos a nós por connect, podemos ter ficado numa situação em que
+                        // aceitámos connect, estávamos MANYNODES mas não tínhamos o nosso vizinho externo preenchido
+                        // com o seu IP e porto. Nesse caso, ao recebermos este NEW temos de notificar todos os internos
+                        neigh_aux = int_neighbours;
+                        while (neigh_aux)
+                        {
+                            writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                            neigh_aux = neigh_aux->next;
+                        }
                     }
                     msg_aux = msg_list;
                     msg_list = msg_list->next;
@@ -304,16 +334,58 @@ int main(int argc, char *argv[])
             }
             else if (tcp_read_flag == MSG_CLOSED)
             {
+
+                if ((errcode = close(external->fd)))
+                {
+                    fprintf(stderr, "error closing external fd when external closes connection: %s\n", strerror(errno));
+                    exit(-1);
+                }
                 // neste caso nós somos o nosso próprio vizinho de backup
                 if (!strcmp(self.IP, backup->IP) && !strcmp(self.port, backup->port))
                 {
-                    
+                    printf("Fomos abandonados pelo nosso externo e éramos o nosso backup\n");
+                    free(external);
+                    // neste caso vamos promover um dos vizinhos internos a vizinho externo
+                    // o vizinho que vai ser promovido vai ser o do topo da lista
+                    if (int_neighbours)
+                    {
+                        external = int_neighbours->this;
+                        neigh_aux = int_neighbours;
+                        int_neighbours = int_neighbours->next;     
+                        free(neigh_aux);
+                        neigh_aux = int_neighbours;
+                        // enviar um EXTERN com os dados do vizinho interno promovido a vizinho externo
+                        // para o notificar  
+                        errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+                            // isto tá mal, o strncpy não afeta o errno!!
+                            // deixo por agora para me lembrar de mudar em todos
+                            fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                            exit(-1);
+                        }
+                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
+                        // para todos os vizinhos internos que não foram promovidos a vizinhos externos, notificá-los também
+                        // que têm um novo vizinho externo
+                        while (neigh_aux)
+                        {
+                            writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                            neigh_aux = neigh_aux->next;
+                        }
+                    }
+                    // caso fôssemos o nosso próprio backup e não tivéssemos vizinhos 
+                    // internos, então vamos sozinhos numa rede
+                    else
+                    {
+                        printf("Não tínhamos vizinhos internos\n");
+                        network_state = ONENODE;
+                        external = NULL;
+                    }
                 }
                 
                 // neste caso temos um backup, tornamos esse backup o nosso externo
                 else
                 {
-                    close(external->fd);
                     
                     // atualizar a informação do vizinho externo
                     strncpy(external->IP, backup->IP, NI_MAXHOST);
@@ -540,9 +612,8 @@ int main(int argc, char *argv[])
                     printf("Error in sscanf JOIN_ID\n");
                     exit(1);
                 }
-                // MAIS OVERFLOWS
-                strcpy(self.IP, argv[1]);
-                strcpy(self.port, argv[2]);
+                strncpy(self.IP, argv[1], NI_MAXHOST);
+                strncpy(self.port, argv[2], NI_MAXSERV);
                 str_id = safeMalloc(sizeof(self.id)+1);
                 // bad monkey no banana
                 // passar isto para snprintf
@@ -557,6 +628,53 @@ int main(int argc, char *argv[])
                 }
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in JOIN UDP message send\n");
                 udp_state = waiting_for_list;
+            }
+            else if (instr_code == JOIN_LINK && network_state == NONODES)
+            {
+                // esta condição em princípio nunca será necessária
+                // visto que quando iniciamos o programa o external é colocado a NULL
+                // e quando fazemos LEAVE também. Portanto temos sempre de alocar memória
+                if (!external)
+                    external = safeMalloc(sizeof(viz));
+                if(sscanf(user_input,"%u %d %s %s",&self.net,&self.id, external->IP, external->port ) != 4)
+                {
+                    printf("Error in sscanf JOIN_LINK\n");
+                    exit(1);
+                }
+                strncpy(self.IP, argv[1], NI_MAXHOST);
+                strncpy(self.port, argv[2], NI_MAXSERV);
+                str_id = safeMalloc(sizeof(self.id)+1);
+
+                external->next_av_ix = 0;
+                safeTCPSocket(&(external->fd));
+                connectTCP(external->IP, external->port, external->fd, 
+                        "Error getting address info for external node in JOIN_LINK\n", "Error connecting to external node in JOIN_LINK\n");
+
+                waiting_for_backup = 1; // we're outnumbered, need backup
+                network_state = TWONODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
+                // quer dizer, podemos ver pelo num_nodes na verdade
+
+                // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
+                errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
+                if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                {
+                    fprintf(stderr, "error in NEW TCP message creation in JOIN_LINK: %s\n", strerror(errno));
+                    exit(-1);
+                }
+                writeTCP(external->fd, strlen(message_buffer), message_buffer);
+            }
+            else if(instr_code == JOIN_SERVER_DOWN && network_state == NONODES)
+            {
+                network_state = ONENODE;
+                we_are_reg = 1;
+
+                if(sscanf(user_input,"%u %d",&self.net,&self.id) != 2)
+                {
+                    printf("Error in sscanf JOIN_LINK\n");
+                    exit(1);
+                }
+                strncpy(self.IP, argv[1], NI_MAXHOST);
+                strncpy(self.port, argv[2], NI_MAXSERV);
             }
             else if (instr_code == LEAVE && network_state != NONODES)
             {
@@ -574,17 +692,20 @@ int main(int argc, char *argv[])
                 // após tirar o registo no servidor de nós, devemos terminar todas as conexões TCP ativas 
                 
                 // terminar a sessão TCP com o vizinho externo
-
-                errcode = close(external->fd);
-                if (errcode)
+                // esta condição é importante para o caso em que fazemos leave e estávamos sozinhos
+                // numa rede
+                if (external)
                 {
-                    fprintf(stderr, "error closing file descriptor of external neighbour: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
+                    errcode = close(external->fd);
+                    if (errcode)
+                    {
+                        fprintf(stderr, "error closing file descriptor of external neighbour: %s\n", strerror(errno));
+                        exit(EXIT_FAILURE);
+                    }
+                    // deixar a variável external pronta para um possível JOIN vindouro
+                    free(external);
+                    external = NULL;
                 }
-                // deixar a variável external pronta para um possível JOIN vindouro
-                free(external);
-                external = NULL;
-
                 // terminar todas as conexões com vizinhos internos
                 // e limpar a memória da lista
                 while (int_neighbours)

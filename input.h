@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 
-enum instr {ERR, JOIN_ID, JOIN_LINK, CREATE, GET, ST, SR, SC, LEAVE, EXIT};
+enum instr {ERR, JOIN_ID, JOIN_SERVER_DOWN, JOIN_LINK, CREATE, GET, ST, SR, SC, LEAVE, EXIT};
 
 
 void helpMenu(void);
