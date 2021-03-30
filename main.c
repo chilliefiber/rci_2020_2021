@@ -580,6 +580,8 @@ int main(int argc, char *argv[])
                         // acabar de preencher a informação do external
                         strncpy(external->IP, nodes_fucking_list->IP, NI_MAXHOST);
                         strncpy(external->port, nodes_fucking_list->port, NI_MAXSERV);
+
+                        external_is_filled = 1;
                     }
                     // neste caso a rede está vazia. O nó coloca-se no estado single_node e regista-se diretamente
                     // no servidor de nós
@@ -628,6 +630,7 @@ int main(int argc, char *argv[])
                 }
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in JOIN UDP message send\n");
                 udp_state = waiting_for_list;
+                external_is_filled = 0;
             }
             else if (instr_code == JOIN_LINK && network_state == NONODES)
             {
@@ -636,6 +639,7 @@ int main(int argc, char *argv[])
                 // e quando fazemos LEAVE também. Portanto temos sempre de alocar memória
                 if (!external)
                     external = safeMalloc(sizeof(viz));
+                external_is_filled = 1;
                 if(sscanf(user_input,"%u %d %s %s",&self.net,&self.id, external->IP, external->port ) != 4)
                 {
                     printf("Error in sscanf JOIN_LINK\n");
