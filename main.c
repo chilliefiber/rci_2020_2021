@@ -19,14 +19,16 @@
 
 
 #define N 2 //capacidade da cache de objetos do nó
+#define SELFFD -1
 
-typedef struct object{
-    char *subname;
-    int id_obj;
-}object;
+typedef struct tab_entry{
+	int id_dest;
+	int fd_sock;
+	struct tab_entry *next;
+}tab_entry;
 
 typedef struct cache_objects{
-    object obj;
+    char *obj;
 }cache_objects;
 
 typedef struct no{
@@ -35,7 +37,6 @@ typedef struct no{
     char IP[NI_MAXHOST]; //endereço IP do nó
     char port[NI_MAXSERV]; //Porto TCP do nó
 }no;
-
 
 //lista dos vizinhos internos do nó
 typedef struct internals{
@@ -48,6 +49,131 @@ typedef struct list_objects{
     char *objct;
     struct list_objects *next;
 }list_objects;
+
+tab_entry *createinsertTabEntry(tab_entry *first_entry, int id_dst, int fd)
+{
+	tab_entry *tmp = first_entry;
+	tab_entry *new_entry = safeMalloc(sizeof(tab_entry));
+	
+	new_entry->id_dest = id_dst;
+	new_entry->fd_sock = fd;
+	
+	if(first_entry == NULL)
+	{
+		first_entry = new_entry;
+		new_entry->next = NULL;
+	}
+	else
+	{
+		while(tmp->next != NULL)
+        {
+            tmp = tmp->next;
+        }
+        tmp->next = new_entry;
+        new_entry->next = NULL;
+	}
+	
+	return first_entry;
+}
+
+void deleteTabEntryid(tab_entry **first_entry, int id_out)
+{
+	tab_entry *tmp;
+	
+	if((*first_entry)->id_dest == id_out)
+    {
+		tmp = *first_entry; 
+        *first_entry = (*first_entry)->next;
+        free(tmp);
+    }
+    else
+    {
+		tab_entry *curr = *first_entry;
+		
+		while(curr->next != NULL)
+		{
+			  if(curr->next->id_dest == id_out)
+              {
+                  tmp = curr->next;
+                  curr->next = curr->next->next;
+                  free(tmp);
+                  break;
+              }
+              else
+                  curr = curr->next;
+		}
+	}
+}
+
+void deleteTabEntryfd(tab_entry **first_entry, int fd_out)
+{
+	tab_entry *tmp;
+	
+	if((*first_entry)->fd_sock == fd_out)
+    {
+		tmp = *first_entry; 
+        *first_entry = (*first_entry)->next;
+        free(tmp);
+    }
+    else
+    {
+		tab_entry *curr = *first_entry;
+		
+		while(curr->next != NULL)
+		{
+			  if(curr->next->fd_sock == fd_out)
+              {
+                  tmp = curr->next;
+                  curr->next = curr->next->next;
+                  free(tmp);
+                  break;
+              }
+              else
+                  curr = curr->next;
+		}
+	}
+}
+
+void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int fd)
+{
+	tab_entry *aux = first_entry;
+	
+	while(aux != NULL)
+	{
+		errcode = snprintf(buffer, 150, "ADVERTISE %d\n",aux->id_dest);  
+        if (buffer == NULL || errcode < 0 || errcode >= 150)
+        {
+            // isto tá mal, o strncpy não afeta o errno!!
+			// deixo por agora para me lembrar de mudar em todos
+			fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+            exit(-1);  
+        }
+        writeTCP(fd, strlen(buffer), buffer);
+        aux = aux->next;
+	}
+}
+
+void printTabExp(tab_entry *first_entry)
+{
+	tab_entry *aux = first_entry;
+	printf("Routing Table:\n");
+	while(aux != NULL)
+	{
+		printf("%d, %d\n",aux->id_dest,aux->fd_sock);
+		aux = aux->next;
+	}
+}
+
+void FreeTabExp(tab_entry *first_entry)
+{
+	tab_entry *aux = first_entry;
+	
+	while(aux != NULL)
+	{
+		free(aux);
+		aux = aux->next;
+	}
+}
 
 list_objects *createinsertObject(list_objects *head, char *subname, char *str_id)
 {
@@ -111,6 +237,8 @@ int main(int argc, char *argv[])
     viz *external=NULL, *new=NULL, *backup=safeMalloc(sizeof(viz));
     // lista de vizinhos internos
     internals *int_neighbours = NULL, *neigh_aux, *neigh_tmp;
+    
+    tab_entry *first_entry = NULL, *tab_aux;
     //cache_objects cache[N];
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
@@ -287,6 +415,17 @@ int main(int argc, char *argv[])
                         }
                         we_are_reg = 1;
                         // deviamos colocar aqui a verificação se somos o nosso próprio backup ou nao, isto é two nodes vs many nodes
+                        
+                        errcode = snprintf(message_buffer, 150, "ADVERTISE %d\n",self.id);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+                            // isto tá mal, o strncpy não afeta o errno!!
+                            // deixo por agora para me lembrar de mudar em todos
+                            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                            exit(-1);
+                        }
+                        
+                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     }
                     // este é o caso em que recebemos connect, mas 
                     // estávamos sozinhos na rede, então o nosso vizinho externo foi
@@ -324,7 +463,45 @@ int main(int argc, char *argv[])
                             writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                             neigh_aux = neigh_aux->next;
                         }
+                        
+                        errcode = snprintf(message_buffer, 150, "ADVERTISE %d\n",self.id);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+                            // isto tá mal, o strncpy não afeta o errno!!
+                            // deixo por agora para me lembrar de mudar em todos
+                            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                            exit(-1);
+                        }
+                        
+                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     }
+                    
+                    //para quando recebemos ADVERTISE do externo, reencaminhar para todos os internos (se tivermos) 
+                    //e depois adicionar entrada a tabela de expedição     
+					if (!strcmp(command, "ADVERTISE") && word_count == 2)
+                    {
+						neigh_aux = int_neighbours;
+						while (neigh_aux != NULL)
+						{
+							writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
+							neigh_aux = neigh_aux->next;
+						}
+						
+						first_entry = createinsertTabEntry(first_entry, atoi(arg1), external->fd);
+					}
+					
+					//receber mensagem WITHDRAW do externo e se tiver internos que não saibam ainda, reencaminhar mensagem
+					if (!strcmp(command, "WITHDRAW") && word_count == 2)
+					{
+						neigh_aux = int_neighbours;
+						while (neigh_aux != NULL)
+						{
+							writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
+							neigh_aux = neigh_aux->next;
+						}
+						deleteTabEntryid(&first_entry, atoi(arg1));
+					}
+                    
                     msg_aux = msg_list;
                     msg_list = msg_list->next;
                     free(msg_aux->message);
@@ -334,7 +511,28 @@ int main(int argc, char *argv[])
             }
             else if (tcp_read_flag == MSG_CLOSED)
             {
-
+                tab_aux = first_entry;
+				while(tab_aux != NULL)
+				{
+					if(tab_aux->fd_sock == external->fd)
+					{
+						neigh_aux = int_neighbours;
+						while (neigh_aux != NULL)
+						{
+							errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
+                        	if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        	{
+								fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
+                            	exit(-1);
+							}
+							writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+							neigh_aux = neigh_aux->next;
+						}
+						deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
+					}
+					tab_aux = tab_aux->next;
+				}
+                
                 if ((errcode = close(external->fd)))
                 {
                     fprintf(stderr, "error closing external fd when external closes connection: %s\n", strerror(errno));
@@ -439,7 +637,48 @@ int main(int argc, char *argv[])
                             printf("Just received our newly arrived internal's data\n");
                             strncpy(neigh_aux->this->IP, arg1, NI_MAXHOST);
                             strncpy(neigh_aux->this->port, arg2, NI_MAXSERV);
+                            
+                            //aqui enviamos ao nó entrante, nosso novo vizinho interno, tantas mensagens ADVERTISE quantas entradas que temos na tabela de expedição
+                            writeAdvtoEntryNode(first_entry, errcode, message_buffer, neigh_aux->this->fd);
                         }
+                        
+                        //para quando recebemos ADVERTISE dum interno, reencaminhar para os restantes internos (se houverem) 
+                        //e para o externo e depois adicionar entrada a tabela de expedição
+                        if (!strcmp(command, "ADVERTISE") && word_count == 2)
+						{
+							neigh_tmp = int_neighbours;
+							while (neigh_tmp != NULL)
+							{
+								if(neigh_tmp->this->fd != neigh_aux->this->fd)
+								{
+									writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
+								}
+								neigh_tmp = neigh_tmp->next;
+							}
+						
+							writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
+		
+							first_entry = createinsertTabEntry(first_entry, atoi(arg1), neigh_aux->this->fd);
+						}
+						
+						//receber mensagem WITHDRAW de um interno e se tiver outros internos e externo que não saibam ainda, reencaminhar mensagem
+						if (!strcmp(command, "WITHDRAW") && word_count == 2)
+						{
+							neigh_tmp = int_neighbours;
+							while (neigh_tmp != NULL)
+							{
+								if(neigh_tmp->this->fd != neigh_aux->this->fd) 
+								{
+									writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
+								}
+								neigh_tmp = neigh_tmp->next;
+							}
+							
+							writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
+							
+							deleteTabEntryid(&first_entry, atoi(arg1));
+						}
+                        
                         msg_aux = msg_list;
                         msg_list = msg_list->next;
                         free(msg_aux->message);
@@ -455,6 +694,39 @@ int main(int argc, char *argv[])
                 // vizinho interno fez leave e fechou as conexões
                 else if (tcp_read_flag == MSG_CLOSED)
                 {
+                    tab_aux = first_entry;
+					while(tab_aux != NULL)
+					{
+						if(tab_aux->fd_sock == neigh_aux->this->fd)
+						{
+							neigh_tmp = int_neighbours;
+							while (neigh_tmp != NULL)
+							{
+								if(neigh_tmp->this->fd != neigh_aux->this->fd) 
+								{
+									errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
+									if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+									{
+										fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
+										exit(-1);
+									}
+									writeTCP(neigh_tmp->this->fd, strlen(message_buffer), message_buffer);
+								}
+								neigh_tmp = neigh_tmp->next;
+							}
+							
+							errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
+							if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+							{
+									fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
+									exit(-1);
+							}
+							writeTCP(external->fd, strlen(message_buffer), message_buffer);
+							deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
+						}
+						tab_aux = tab_aux->next;
+					}
+                    
                     close(neigh_aux->this->fd); // fechar o fd do tipo que fez close do outro lado
                     printf("O nosso vizinho interno abandonou\n");
                     // remover o vizinho interno da lista
@@ -541,6 +813,7 @@ int main(int argc, char *argv[])
                 // neste caso não recebemos
                 if (flag)
                 {
+                    first_entry = createinsertTabEntry(first_entry, self.id, SELFFD);
                     printf("We received the list of nodes from the server\n");
                     // assign a random node 
                     if (list_msg)
@@ -666,6 +939,8 @@ int main(int argc, char *argv[])
                     exit(-1);
                 }
                 writeTCP(external->fd, strlen(message_buffer), message_buffer);
+                
+                first_entry = createinsertTabEntry(first_entry, self.id, SELFFD);
             }
             else if(instr_code == JOIN_SERVER_DOWN && network_state == NONODES)
             {
@@ -679,6 +954,8 @@ int main(int argc, char *argv[])
                 }
                 strncpy(self.IP, argv[1], NI_MAXHOST);
                 strncpy(self.port, argv[2], NI_MAXSERV);
+                
+                first_entry = createinsertTabEntry(first_entry, self.id, SELFFD);
             }
             else if (instr_code == LEAVE && network_state != NONODES)
             {
@@ -727,6 +1004,7 @@ int main(int argc, char *argv[])
                     neigh_aux = NULL;
                 }
                 
+                FreeTabExp(first_entry);
                 // indicar que não estamos ligados a qualquer rede
                 network_state = NONODES;
             }
@@ -765,6 +1043,10 @@ int main(int argc, char *argv[])
                 else
                     printf("Error in FSM: show topology\n");
             }
+            else if(instr_code == SR && network_state != NONODES)
+            {
+				printTabExp(first_entry);
+			}
             free(user_input);
         }
     }	
