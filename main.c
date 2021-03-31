@@ -140,7 +140,7 @@ void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int 
 	
 	while(aux != NULL)
 	{
-		errcode = snprintf(buffer, 150, "ADVERTISE %d\n",aux->id_dest);  
+	errcode = snprintf(buffer, 150, "ADVERTISE %d\n",aux->id_dest);  
         if (buffer == NULL || errcode < 0 || errcode >= 150)
         {
             // isto tá mal, o strncpy não afeta o errno!!
@@ -317,7 +317,9 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Error accepting new TCP connection: %s\n", strerror(errno));
                 exit(EXIT_FAILURE);
             }
-
+	    
+	    writeAdvtoEntryNode(first_entry, errcode, message_buffer, new->fd);
+	
             // se este processo estava em modo NONODES, ninguém nos deve contactar por TCP
             // porque não estamos ligados a qualquer rede
             if (network_state == NONODES)
@@ -416,16 +418,6 @@ int main(int argc, char *argv[])
                         we_are_reg = 1;
                         // deviamos colocar aqui a verificação se somos o nosso próprio backup ou nao, isto é two nodes vs many nodes
                         
-                        errcode = snprintf(message_buffer, 150, "ADVERTISE %d\n",self.id);  
-                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-                        {
-                            // isto tá mal, o strncpy não afeta o errno!!
-                            // deixo por agora para me lembrar de mudar em todos
-                            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
-                            exit(-1);
-                        }
-                        
-                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     }
                     // este é o caso em que recebemos connect, mas 
                     // estávamos sozinhos na rede, então o nosso vizinho externo foi
@@ -464,43 +456,33 @@ int main(int argc, char *argv[])
                             neigh_aux = neigh_aux->next;
                         }
                         
-                        errcode = snprintf(message_buffer, 150, "ADVERTISE %d\n",self.id);  
-                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-                        {
-                            // isto tá mal, o strncpy não afeta o errno!!
-                            // deixo por agora para me lembrar de mudar em todos
-                            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
-                            exit(-1);
-                        }
-                        
-                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     }
                     
                     //para quando recebemos ADVERTISE do externo, reencaminhar para todos os internos (se tivermos) 
                     //e depois adicionar entrada a tabela de expedição     
-					if (!strcmp(command, "ADVERTISE") && word_count == 2)
+		    if (!strcmp(command, "ADVERTISE") && word_count == 2)
                     {
-						neigh_aux = int_neighbours;
-						while (neigh_aux != NULL)
-						{
-							writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
-							neigh_aux = neigh_aux->next;
-						}
+			neigh_aux = int_neighbours;
+			while (neigh_aux != NULL)
+			{
+			    writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
+		     	    neigh_aux = neigh_aux->next;
+			}
 						
-						first_entry = createinsertTabEntry(first_entry, atoi(arg1), external->fd);
-					}
+			first_entry = createinsertTabEntry(first_entry, atoi(arg1), external->fd);
+		    }
 					
-					//receber mensagem WITHDRAW do externo e se tiver internos que não saibam ainda, reencaminhar mensagem
-					if (!strcmp(command, "WITHDRAW") && word_count == 2)
-					{
-						neigh_aux = int_neighbours;
-						while (neigh_aux != NULL)
-						{
-							writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
-							neigh_aux = neigh_aux->next;
-						}
-						deleteTabEntryid(&first_entry, atoi(arg1));
-					}
+		    //receber mensagem WITHDRAW do externo e se tiver internos que não saibam ainda, reencaminhar mensagem e depois eliminar entrada da tabela de expedição
+		    if (!strcmp(command, "WITHDRAW") && word_count == 2)
+		    {
+			neigh_aux = int_neighbours;
+			while (neigh_aux != NULL)
+			{
+			    writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
+		    	    neigh_aux = neigh_aux->next;
+			}
+			deleteTabEntryid(&first_entry, atoi(arg1));
+		    }
                     
                     msg_aux = msg_list;
                     msg_list = msg_list->next;
@@ -512,26 +494,26 @@ int main(int argc, char *argv[])
             else if (tcp_read_flag == MSG_CLOSED)
             {
                 tab_aux = first_entry;
-				while(tab_aux != NULL)
-				{
-					if(tab_aux->fd_sock == external->fd)
-					{
-						neigh_aux = int_neighbours;
-						while (neigh_aux != NULL)
-						{
-							errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
-                        	if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-                        	{
-								fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
-                            	exit(-1);
-							}
-							writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
-							neigh_aux = neigh_aux->next;
-						}
-						deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
-					}
-					tab_aux = tab_aux->next;
-				}
+		while(tab_aux != NULL)
+		{
+		    if(tab_aux->fd_sock == external->fd)
+		    {
+			errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+			    fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
+                            exit(-1);
+			}
+			neigh_aux = int_neighbours;
+			while (neigh_aux != NULL)
+			{
+			    writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+			    neigh_aux = neigh_aux->next;
+			}
+			deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
+		    }
+			tab_aux = tab_aux->next;
+		}
                 
                 if ((errcode = close(external->fd)))
                 {
@@ -607,6 +589,7 @@ int main(int argc, char *argv[])
 
                     // possivelmente deixar alguma informação na estrutura do backup que está desatualizado
                     // mas como estamos waiting_for_backup, podemos deduzir isso daí
+		    writeAdvtoEntryNode(first_entry, errcode, message_buffer, external->fd);
                 }
             }
         }
@@ -637,47 +620,45 @@ int main(int argc, char *argv[])
                             printf("Just received our newly arrived internal's data\n");
                             strncpy(neigh_aux->this->IP, arg1, NI_MAXHOST);
                             strncpy(neigh_aux->this->port, arg2, NI_MAXSERV);
-                            
-                            //aqui enviamos ao nó entrante, nosso novo vizinho interno, tantas mensagens ADVERTISE quantas entradas que temos na tabela de expedição
-                            writeAdvtoEntryNode(first_entry, errcode, message_buffer, neigh_aux->this->fd);
                         }
                         
                         //para quando recebemos ADVERTISE dum interno, reencaminhar para os restantes internos (se houverem) 
                         //e para o externo e depois adicionar entrada a tabela de expedição
                         if (!strcmp(command, "ADVERTISE") && word_count == 2)
-						{
-							neigh_tmp = int_neighbours;
-							while (neigh_tmp != NULL)
-							{
-								if(neigh_tmp->this->fd != neigh_aux->this->fd)
-								{
-									writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
-								}
-								neigh_tmp = neigh_tmp->next;
-							}
+			{
+			    neigh_tmp = int_neighbours;
+			    while (neigh_tmp != NULL)
+			    {
+				if(neigh_tmp->this->fd != neigh_aux->this->fd)
+			 	{
+				    writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
+				}
+				neigh_tmp = neigh_tmp->next;
+			    }
 						
-							writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
+			    writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
 		
-							first_entry = createinsertTabEntry(first_entry, atoi(arg1), neigh_aux->this->fd);
-						}
+			    first_entry = createinsertTabEntry(first_entry, atoi(arg1), neigh_aux->this->fd);
+			}
 						
-						//receber mensagem WITHDRAW de um interno e se tiver outros internos e externo que não saibam ainda, reencaminhar mensagem
-						if (!strcmp(command, "WITHDRAW") && word_count == 2)
-						{
-							neigh_tmp = int_neighbours;
-							while (neigh_tmp != NULL)
-							{
-								if(neigh_tmp->this->fd != neigh_aux->this->fd) 
-								{
-									writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
-								}
-								neigh_tmp = neigh_tmp->next;
-							}
+			//receber mensagem WITHDRAW de um interno e se tiver outros internos e externo que não saibam ainda, reencaminhar mensagem
+			//e depois eliminar entrada da tabela de expedição
+			if (!strcmp(command, "WITHDRAW") && word_count == 2)
+			{
+			    neigh_tmp = int_neighbours;
+			    while (neigh_tmp != NULL)
+			    {
+				if(neigh_tmp->this->fd != neigh_aux->this->fd) 
+				{
+				    writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
+				}
+				neigh_tmp = neigh_tmp->next;
+			    }
 							
-							writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
+			    writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
 							
-							deleteTabEntryid(&first_entry, atoi(arg1));
-						}
+			    deleteTabEntryid(&first_entry, atoi(arg1));
+			}
                         
                         msg_aux = msg_list;
                         msg_list = msg_list->next;
@@ -695,37 +676,31 @@ int main(int argc, char *argv[])
                 else if (tcp_read_flag == MSG_CLOSED)
                 {
                     tab_aux = first_entry;
-					while(tab_aux != NULL)
-					{
-						if(tab_aux->fd_sock == neigh_aux->this->fd)
-						{
-							neigh_tmp = int_neighbours;
-							while (neigh_tmp != NULL)
-							{
-								if(neigh_tmp->this->fd != neigh_aux->this->fd) 
-								{
-									errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
-									if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-									{
-										fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
-										exit(-1);
-									}
-									writeTCP(neigh_tmp->this->fd, strlen(message_buffer), message_buffer);
-								}
-								neigh_tmp = neigh_tmp->next;
-							}
+		    while(tab_aux != NULL)
+		    {
+			if(tab_aux->fd_sock == neigh_aux->this->fd)
+			{
+			    errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
+			    if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+			    {
+				fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
+		   	        exit(-1);
+			    }
+			    neigh_tmp = int_neighbours;
+			    while (neigh_tmp != NULL)
+			    {
+				if(neigh_tmp->this->fd != neigh_aux->this->fd) 
+				{
+				    writeTCP(neigh_tmp->this->fd, strlen(message_buffer), message_buffer);
+				}
+				neigh_tmp = neigh_tmp->next;
+			    }
 							
-							errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
-							if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-							{
-									fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
-									exit(-1);
-							}
-							writeTCP(external->fd, strlen(message_buffer), message_buffer);
-							deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
-						}
-						tab_aux = tab_aux->next;
-					}
+			    writeTCP(external->fd, strlen(message_buffer), message_buffer);
+			    deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
+			}
+			tab_aux = tab_aux->next;
+		    }
                     
                     close(neigh_aux->this->fd); // fechar o fd do tipo que fez close do outro lado
                     printf("O nosso vizinho interno abandonou\n");
@@ -855,6 +830,17 @@ int main(int argc, char *argv[])
                         strncpy(external->port, nodes_fucking_list->port, NI_MAXSERV);
 
                         external_is_filled = 1;
+			    
+			errcode = snprintf(message_buffer, 150, "ADVERTISE %d\n",self.id);  
+			if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+			{
+			    // isto tá mal, o strncpy não afeta o errno!!
+			    // deixo por agora para me lembrar de mudar em todos
+			    fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+			    exit(-1);
+			}
+                        
+			writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     }
                     // neste caso a rede está vazia. O nó coloca-se no estado single_node e regista-se diretamente
                     // no servidor de nós
@@ -941,6 +927,17 @@ int main(int argc, char *argv[])
                 writeTCP(external->fd, strlen(message_buffer), message_buffer);
                 
                 first_entry = createinsertTabEntry(first_entry, self.id, SELFFD);
+		
+		errcode = snprintf(message_buffer, 150, "ADVERTISE %d\n",self.id);  
+	        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+		{
+		    // isto tá mal, o strncpy não afeta o errno!!
+		    // deixo por agora para me lembrar de mudar em todos
+		    fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+		    exit(-1);
+		}
+                        
+		writeTCP(external->fd, strlen(message_buffer), message_buffer);
             }
             else if(instr_code == JOIN_SERVER_DOWN && network_state == NONODES)
             {
@@ -1045,8 +1042,8 @@ int main(int argc, char *argv[])
             }
             else if(instr_code == SR && network_state != NONODES)
             {
-				printTabExp(first_entry);
-			}
+		printTabExp(first_entry);
+	    }
             free(user_input);
         }
     }	
