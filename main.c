@@ -629,6 +629,8 @@ int main(int argc, char *argv[])
 						ident = atoi(token1);
 						free(str_name);
 					
+						external->flag_interest = 1;
+						
 						if(self.id == ident)
 						{
 							if(checkObjectList(head, arg1) == 1)
@@ -657,6 +659,7 @@ int main(int argc, char *argv[])
                         
 								writeTCP(external->fd, strlen(message_buffer), message_buffer);
 							}
+							external->flag_interest = 0;
 						}
 						else
 						{
@@ -672,6 +675,7 @@ int main(int argc, char *argv[])
 								}
                         
 								writeTCP(external->fd, strlen(message_buffer), message_buffer);
+								external->flag_interest = 0;
 							}
 							else
 							{
@@ -910,7 +914,7 @@ int main(int argc, char *argv[])
 						//para quando recebemos uma mensagem INTEREST dum vizinho interno, ativar flag_msg_interest para esse interno, e verificar primeiro se temos o objecto armazenado na cache
 						// se tivermos o objeto na cache enviar mensagem DATA de volta a esse interno
 						// se não tivermos o objeto na cache reencaminhar mensagem INTEREST aos restantes internos (se houverem) e depois ao externo
-                        if (!strcmp(command, "INTEREST") && word_count == 2)
+                       				if (!strcmp(command, "INTEREST") && word_count == 2)
 						{
 							token1 = NULL; 
 							ident = 0;
@@ -998,8 +1002,7 @@ int main(int argc, char *argv[])
 								saveinCache(cache, arg1, n_obj);
 								n_obj--;
 							}
-	
-							external->flag_interest = 1; 
+	 
 							neigh_tmp = int_neighbours;
 							while (neigh_tmp != NULL)
 							{
@@ -1022,7 +1025,6 @@ int main(int argc, char *argv[])
 						//depois reencaminhamos a mensagem para o vizinho de onde veio a mensagem de interesse inicial
 						if (!strcmp(command, "NODATA") && word_count == 2)
 						{
-							external->flag_interest = 1;
 							neigh_tmp = int_neighbours;
 							while (neigh_tmp != NULL)
 							{
