@@ -838,6 +838,24 @@ int main(int argc, char *argv[])
                     writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     waiting_for_backup = 1; // we're outnumbered, need backup
 
+		    //se tivermos internos que não sabem ainda que o nosso externo (o seu backup) mudou, notificá-los através da mensagem EXTERN
+                    if(int_neighbours)
+                    {
+			errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
+                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                        {
+                            // isto tá mal, o strncpy não afeta o errno!!
+                            // deixo por agora para me lembrar de mudar em todos
+                            fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                            exit(-1);
+                        }
+                        neigh_aux = int_neighbours;
+                        while (neigh_aux != NULL)
+                        {
+                            writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                            neigh_aux = neigh_aux->next;
+                        }
+		    }
                     // possivelmente deixar alguma informação na estrutura do backup que está desatualizado
                     // mas como estamos waiting_for_backup, podemos deduzir isso daí
                     writeAdvtoEntryNode(first_entry, errcode, message_buffer, external->fd);
