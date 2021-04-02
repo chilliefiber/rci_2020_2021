@@ -275,13 +275,13 @@ int saveinCache(cache_objects cache[N], char *name, int n_obj)
 	int i;
 	
 	if(n_obj > N)
-    {
+        {
 	    for(i=0; i<N-1; i++)
 		{
 		    free(cache[i].obj);	
 		    cache[i].obj = NULL;
-			cache[i].obj = safeMalloc(strlen(cache[i+1].obj)+1);
-			strcpy(cache[i].obj, cache[i+1].obj);
+		    cache[i].obj = safeMalloc(strlen(cache[i+1].obj)+1);
+		    strcpy(cache[i].obj, cache[i+1].obj);
 		}
 		free(cache[i].obj);
 		n_obj--;	
@@ -458,6 +458,7 @@ int main(int argc, char *argv[])
             printf("New connection mudafucka\n");
             new = safeMalloc(sizeof(viz));
             new->next_av_ix = 0;
+	    new->flag_interest = 0;
             addrlen = sizeof(addr);
             if ((new->fd = accept(tcp_server_fd, &addr, &addrlen)) == -1)
             {
@@ -867,7 +868,7 @@ int main(int argc, char *argv[])
                     }
                     writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     waiting_for_backup = 1; // we're outnumbered, need backup
-
+		    external->flag_interest = 0;
                     //se tivermos internos que não sabem ainda que o nosso externo (o seu backup) mudou, notificá-los através da mensagem EXTERN
                     if(int_neighbours)
                     {
@@ -1059,7 +1060,6 @@ int main(int argc, char *argv[])
                                 {
                                     writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
                                     neigh_tmp->this->flag_interest = 0;
-                                    external->flag_interest = 0;
                                 }
                                 neigh_tmp = neigh_tmp->next;
                             }
@@ -1067,6 +1067,7 @@ int main(int argc, char *argv[])
                             if(external->flag_interest == 1)
                             {
                                 writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
+				external->flag_interest = 0;
                             }
                         }
 
@@ -1083,7 +1084,6 @@ int main(int argc, char *argv[])
                                 {
                                     writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
                                     neigh_tmp->this->flag_interest = 0;
-                                    external->flag_interest = 0;
                                 }
                                 neigh_tmp = neigh_tmp->next;
                             }
@@ -1091,6 +1091,7 @@ int main(int argc, char *argv[])
                             if(external->flag_interest == 1)
                             {
                                 writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
+				external->flag_interest = 0;
                             }
                         }
 
@@ -1251,7 +1252,7 @@ int main(int argc, char *argv[])
                         // e portanto não precisamos mais dela
                         nodes_fucking_list = NULL;
                         parseNodeListRecursive(list_msg, &num_nodes, &nodes_fucking_list);
-                        printf("%d\n",num_nodes);
+                        // printf("%d\n",num_nodes);
                         external = safeMalloc(sizeof(viz));
                         external->next_av_ix = 0;
                         safeTCPSocket(&(external->fd));
@@ -1261,7 +1262,7 @@ int main(int argc, char *argv[])
                         waiting_for_backup = 1; // we're outnumbered, need backup
                         network_state = TWONODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                         // quer dizer, podemos ver pelo num_nodes na verdade
-
+	     	        external->flag_interest = 0;
                         // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
                         errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -1358,7 +1359,7 @@ int main(int argc, char *argv[])
                 waiting_for_backup = 1; // we're outnumbered, need backup
                 network_state = TWONODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                 // quer dizer, podemos ver pelo num_nodes na verdade
-
+		external->flag_interest = 0;
                 // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
                 errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -1486,7 +1487,7 @@ int main(int argc, char *argv[])
                                 }
                                 else
                                 {
-                                    printf("Object %s not found!\n", user_input);
+                                    printf("Object %s not found in our own list of objects!\n", user_input);
                                 }
                             }
                             if(tab_aux->id_dest == ident && tab_aux->fd_sock != SELFFD)
