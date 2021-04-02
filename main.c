@@ -18,8 +18,9 @@
 #define max(A,B) ((A)>=(B)?(A):(B))
 
 
-#define N 2 //capacidade da cache de objetos do nó
+// #define N 2 //capacidade da cache de objetos do nó
 #define SELFFD -1
+int N;
 
 typedef struct tab_entry{
     int id_dest;
@@ -307,7 +308,7 @@ void printCache(cache_objects cache[N], int n_obj)
 int checkObjectList(list_objects *head_obj, char *name)
 {
     list_objects *aux = head_obj;
-
+    
     while(aux != NULL)
     {
         if(!strcmp(aux->objct, name))
@@ -322,6 +323,7 @@ int checkObjectList(list_objects *head_obj, char *name)
 void printObjectList(list_objects *head_obj)
 {
     list_objects *aux = head_obj;
+    printf("List of objects:\n");
     while(aux != NULL)
     {
         printf("%s\n",aux->objct);
@@ -356,6 +358,53 @@ void addToList(internals **int_neighbours, viz *new)
 
 int main(int argc, char *argv[])
 {
+    if(argc < 5 || argc > 6)
+    {
+        printf("Invalid number of arguments!\n");
+        printf("Usage: ./ndn IP TCP regIP regUDP\nOptional Usage: ./ndn IP TCP regIP regUDP cache_size\n");
+        exit(1);
+    }
+    
+    if(isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
+    {
+        if(isIP(argv[1]) == 0)
+        printf("Invalid IP address! Error in <argv[1]>\n");
+        if(isPort(argv[2]) == 0)
+        printf("Invalid TCP port! Error in <argv[2]>\n");
+        if(isIP(argv[3]) == 0)
+        printf("Invalid regIP address! Error in <argv[3]>\n");
+        if(isPort(argv[4]) == 0)
+        printf("Invalid regUDP port! Error in <argv[4]>\n");
+	printf("Usage: ./ndn IP TCP regIP regUDP\nOptional Usage: ./ndn IP TCP regIP regUDP cache_size\n");	
+        exit(1);
+    }
+    
+    if(argc == 6)
+    {
+        if(checkDigit(argv[5]) == 1)
+	{
+	    N = atoi(argv[5]);
+   	    if(N == 0)
+	    {
+	        printf("Invalid size for cache! Must be able to save at least 1 object!\n");
+		printf("Usage: ./ndn IP TCP regIP regUDP\nOptional Usage: ./ndn IP TCP regIP regUDP cache_size\n");
+		exit(1);
+            }
+            printf("Cache size: %d\n",N); 
+	}
+        else
+        {
+	    printf("Invalid size for cache!\n");
+	    printf("Usage: ./ndn IP TCP regIP regUDP\nOptional Usage: ./ndn IP TCP regIP regUDP cache_size\n");
+	    exit(1);    
+        }
+    }
+	
+    if(argc == 5) 
+    {
+        N = 2;
+        printf("Default cache size: %d\n",N);
+    }
     // enum dos vários estados associados à rede de nós
     // NONODES no caso em que não existem nós
     // TWONODES no caso em que a rede tem dois nós
@@ -401,11 +450,7 @@ int main(int argc, char *argv[])
     memset(&act, 0, sizeof act);
     act.sa_handler = SIG_IGN;
     if(sigaction(SIGPIPE, &act, NULL) == -1) exit(1);
-    if(argc != 5 || isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
-    {
-        printf("Usage: ./ndn IP TCP regIP regUDP\n");
-        exit(1);
-    }
+    
     if ((fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) == -1) exit(1);
     safeTCPSocket(&tcp_server_fd);
     memset(&hints, 0, sizeof(hints));
