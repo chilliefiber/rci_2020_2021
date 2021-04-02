@@ -270,26 +270,28 @@ int checkCache(cache_objects cache[N], char *name, int n_obj)
     return 0;
 }
 
-void saveinCache(cache_objects cache[N], char *name, int n_obj)
+int saveinCache(cache_objects cache[N], char *name, int n_obj)
 {
-    if(n_obj > N)
+	int i;
+	
+	if(n_obj > N)
     {
-        free(cache[0].obj);
-        cache[0].obj = safeMalloc(strlen(cache[1].obj));
-        strcpy(cache[0].obj, cache[1].obj);
-        free(cache[1].obj);
-        n_obj--;
-    }
-    if(n_obj == 1)
-    {
-        cache[0].obj = safeMalloc(strlen(name)+1);
-        strcpy(cache[0].obj, name);
-    }
-    if(n_obj == 2)
-    {
-        cache[1].obj = safeMalloc(strlen(name)+1);
-        strcpy(cache[1].obj, name);
-    }
+	    for(i=0; i<N-1; i++)
+		{
+		    free(cache[i].obj);	
+		    cache[i].obj = NULL;
+			cache[i].obj = safeMalloc(strlen(cache[i+1].obj)+1);
+			strcpy(cache[i].obj, cache[i+1].obj);
+		}
+		free(cache[i].obj);
+		n_obj--;	
+	}
+
+	cache[n_obj-1].obj = NULL;
+	cache[n_obj-1].obj = safeMalloc(strlen(name)+1);
+	strcpy(cache[n_obj-1].obj, name);
+	
+	return n_obj;
 }
 
 void printCache(cache_objects cache[N], int n_obj)
@@ -720,15 +722,7 @@ int main(int argc, char *argv[])
                     if (!strcmp(command, "DATA") && word_count == 2)
                     {
                         n_obj++;
-                        if(n_obj <= N)
-                        {
-                            saveinCache(cache, arg1 ,n_obj);
-                        }
-                        else
-                        {
-                            saveinCache(cache, arg1, n_obj);
-                            n_obj--;
-                        }
+                        n_obj = saveinCache(cache, arg1, n_obj);
 
                         neigh_aux = int_neighbours;
                         while (neigh_aux != NULL)
@@ -774,14 +768,9 @@ int main(int argc, char *argv[])
                 we_used_tab_tmp = 0;
                 while(tab_aux != NULL)
                 {
-                    printf("Aqui\n");
                     if(tab_aux->fd_sock == external->fd)
                     {
                         tab_tmp = tab_aux->next;
-                        if (tab_tmp == NULL)
-                            printf("Tudo certo\n");
-                        else
-                            printf("TUDO EM VÃO\n");
                         we_used_tab_tmp = 1;
                         errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -1061,15 +1050,7 @@ int main(int argc, char *argv[])
                         if (!strcmp(command, "DATA") && word_count == 2)
                         {
                             n_obj++;
-                            if(n_obj <= N)
-                            {
-                                saveinCache(cache, arg1 ,n_obj);
-                            }
-                            else
-                            {
-                                saveinCache(cache, arg1, n_obj);
-                                n_obj--;
-                            }
+                            n_obj = saveinCache(cache, arg1, n_obj);
 
                             neigh_tmp = int_neighbours;
                             while (neigh_tmp != NULL)
@@ -1159,7 +1140,7 @@ int main(int argc, char *argv[])
                         if (we_used_tab_tmp)
                         {
                             tab_aux = tab_tmp;
-                            tab_tmp = NULL
+                            tab_tmp = NULL;
                             we_used_tab_tmp = 0;
                         }
                         else
