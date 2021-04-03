@@ -194,6 +194,17 @@ void FreeTabExp(tab_entry **first_entry)
     *first_entry = NULL;
 }
 
+void FreeCache(cache_objects cache[N], int n_obj)
+{
+    int i;
+	
+    for(i=0; i<n_obj; i++)
+    {
+        free(cache[i].obj);
+	cache[i].obj = NULL;
+    }
+}
+
 char *getConcatString( const char *str1, const char *str2 ) 
 {
     char *finalString = NULL;
@@ -273,26 +284,26 @@ int checkCache(cache_objects cache[N], char *name, int n_obj)
 
 int saveinCache(cache_objects cache[N], char *name, int n_obj)
 {
-	int i;
+    int i;
 	
-	if(n_obj > N)
-        {
-	    for(i=0; i<N-1; i++)
-		{
-		    free(cache[i].obj);	
-		    cache[i].obj = NULL;
-		    cache[i].obj = safeMalloc(strlen(cache[i+1].obj)+1);
-		    strcpy(cache[i].obj, cache[i+1].obj);
-		}
-		free(cache[i].obj);
-		n_obj--;	
-	}
+    if(n_obj > N)
+    {
+        for(i=0; i<N-1; i++)
+	{
+            free(cache[i].obj);	
+            cache[i].obj = NULL;
+	    cache[i].obj = safeMalloc(strlen(cache[i+1].obj)+1);
+            strcpy(cache[i].obj, cache[i+1].obj);
+        }
+	free(cache[i].obj);
+   	n_obj--;	
+    }
 
-	cache[n_obj-1].obj = NULL;
-	cache[n_obj-1].obj = safeMalloc(strlen(name)+1);
-	strcpy(cache[n_obj-1].obj, name);
+    cache[n_obj-1].obj = NULL;
+    cache[n_obj-1].obj = safeMalloc(strlen(name)+1);
+    strcpy(cache[n_obj-1].obj, name);
 	
-	return n_obj;
+    return n_obj;
 }
 
 void printCache(cache_objects cache[N], int n_obj)
@@ -1490,6 +1501,9 @@ int main(int argc, char *argv[])
                 }
 
                 FreeTabExp(&first_entry);
+                FreeObjectList(&head);
+                FreeCache(cache,n_obj);
+                n_obj = 0;
                 // indicar que não estamos ligados a qualquer rede
                 network_state = NONODES;
             }
@@ -1594,11 +1608,11 @@ int main(int argc, char *argv[])
             {
                 printTabExp(first_entry);
             }
-            else if(instr_code == SC)
+            else if(instr_code == SC && network_state != NONODES)
             {
                 printCache(cache,n_obj);		
             }
-            else if(network_state == NONODES && (instr_code == SR || instr_code == GET))
+            else if(network_state == NONODES && (instr_code == SR || instr_code == SC || instr_code == GET || instr_code == CREATE || instr_code == LEAVE))
             {
                 printf("We're not connected to any network\n");
             }
