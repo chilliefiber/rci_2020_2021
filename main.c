@@ -194,17 +194,6 @@ void FreeTabExp(tab_entry **first_entry)
     *first_entry = NULL;
 }
 
-void FreeCache(cache_objects cache[N], int n_obj)
-{
-    int i;
-	
-    for(i=0; i<n_obj; i++)
-    {
-        free(cache[i].obj);
-	cache[i].obj = NULL;
-    }
-}
-
 char *getConcatString( const char *str1, const char *str2 ) 
 {
     char *finalString = NULL;
@@ -224,13 +213,26 @@ char *getConcatString( const char *str1, const char *str2 )
     return finalString;
 }
 
+int checkObjectList(list_objects *head_obj, char *name)
+{
+    list_objects *aux = head_obj;
+    
+    while(aux != NULL)
+    {
+        if(!strcmp(aux->objct, name))
+        {
+            return 1;
+        }
+        aux = aux->next;
+    }
+    return 0;
+}
+
 list_objects *createinsertObject(list_objects *head, char *subname, int id)
 {
     int errcode;
     char *str;
-    char str_id[150]; 
-    list_objects *tmp = head;
-    list_objects *new_obj = safeMalloc(sizeof(list_objects));
+    char str_id[150];
 
     memset(str_id, 0, 150);
 
@@ -243,29 +245,62 @@ list_objects *createinsertObject(list_objects *head, char *subname, int id)
 
     str = getConcatString(str_id, subname);
 
-    new_obj->objct = safeMalloc(strlen(str)+1);
-    // INSEGURO
-    strcpy(new_obj->objct, str);
-
-    free(str);
-    //printf("%s:%d\n",new_obj->objct, strlen(new_obj->objct));
-
-    if(head == NULL)
+    if(checkObjectList(head,str) == 1)
     {
-        head = new_obj;
-        new_obj->next = NULL;
+        printf("Object %s already exists in our own list of objects!\n", str);
     }
     else
     {
-        while(tmp->next != NULL)
+	list_objects *tmp = head;
+        list_objects *new_obj = safeMalloc(sizeof(list_objects));
+        new_obj->objct = safeMalloc(strlen(str)+1);
+        // INSEGURO
+        strcpy(new_obj->objct, str);
+
+        if(head == NULL)
         {
-            tmp = tmp->next;
+            head = new_obj;
+            new_obj->next = NULL;
         }
-        tmp->next = new_obj;
-        new_obj->next = NULL;
+        else
+        {
+            while(tmp->next != NULL)
+            {
+                tmp = tmp->next;
+            }
+            tmp->next = new_obj;
+            new_obj->next = NULL;
+        } 
+    }
+    free(str);
+    return head;
+}
+
+void printObjectList(list_objects *head_obj)
+{
+    list_objects *aux = head_obj;
+    printf("List of objects:\n");
+    while(aux != NULL)
+    {
+        printf("%s\n",aux->objct);
+        aux = aux->next;
+    }
+}
+
+void FreeObjectList(list_objects **head_obj)
+{
+    list_objects *curr = *head_obj;
+    list_objects *next;
+
+    while(curr != NULL)
+    {
+        next = curr->next;
+        free(curr->objct);
+        free(curr);
+        curr = next;
     }
 
-    return head;
+    *head_obj = NULL;
 }
 
 int checkCache(cache_objects cache[N], char *name, int n_obj)
@@ -316,46 +351,15 @@ void printCache(cache_objects cache[N], int n_obj)
     }
 }
 
-int checkObjectList(list_objects *head_obj, char *name)
+void FreeCache(cache_objects cache[N], int n_obj)
 {
-    list_objects *aux = head_obj;
-    
-    while(aux != NULL)
+    int i;
+	
+    for(i=0; i<n_obj; i++)
     {
-        if(!strcmp(aux->objct, name))
-        {
-            return 1;
-        }
-        aux = aux->next;
+        free(cache[i].obj);
+	cache[i].obj = NULL;
     }
-    return 0;
-}
-
-void printObjectList(list_objects *head_obj)
-{
-    list_objects *aux = head_obj;
-    printf("List of objects:\n");
-    while(aux != NULL)
-    {
-        printf("%s\n",aux->objct);
-        aux = aux->next;
-    }
-}
-
-void FreeObjectList(list_objects **head_obj)
-{
-    list_objects *curr = *head_obj;
-    list_objects *next;
-
-    while(curr != NULL)
-    {
-        next = curr->next;
-        free(curr->objct);
-        free(curr);
-        curr = next;
-    }
-
-    *head_obj = NULL;
 }
 
 void addToList(internals **int_neighbours, viz *new)
@@ -455,6 +459,7 @@ int main(int argc, char *argv[])
     messages *msg_list, *msg_aux;
     no self;
     list_objects *head = NULL;
+    int i;
 
     struct sigaction act;
     // Protection against SIGPIPE signals 
@@ -1509,14 +1514,21 @@ int main(int argc, char *argv[])
             }
             else if (instr_code == CREATE && network_state != NONODES)
             {
-                user_input[strlen(user_input)-1] = '\0';
-                //printf("%s:%d\n",user_input, strlen(user_input));
+                for(i=0; i<strlen(user_input); i++)
+	        {
+		    if(user_input[i] == ' ' || user_input[i] == '\n')
+		    user_input[i] = '\0';	
+		}
                 head = createinsertObject(head,user_input,self.id);
                 printObjectList(head);
             }
             else if (instr_code == GET && network_state != NONODES)
             {
-                user_input[strlen(user_input)-1] = '\0';
+                for(i=0; i<strlen(user_input); i++)
+	        {
+		    if(user_input[i] == ' ' || user_input[i] == '\n')
+		    user_input[i] = '\0';	
+		}
                 token1 = NULL; 
                 ident = 0;
                 str_name = safeMalloc(strlen(user_input)+1); 
