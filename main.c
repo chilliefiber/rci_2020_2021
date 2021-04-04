@@ -440,7 +440,7 @@ int main(int argc, char *argv[])
     // mas ainda não recebemos a mensagem de contacto
     viz *external=NULL, *new=NULL, *backup=safeMalloc(sizeof(viz));
     // lista de vizinhos internos
-    internals *int_neighbours = NULL, *neigh_aux, *neigh_tmp;
+    internals *int_neighbours = NULL, *neigh_aux, *neigh_tmp, *neigh_tmp2;
 
     tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
     cache_objects cache[N];
@@ -1181,14 +1181,14 @@ int main(int argc, char *argv[])
                                 fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
                                 exit(-1);
                             }
-                            neigh_tmp = int_neighbours;
-                            while (neigh_tmp != NULL)
+                            neigh_tmp2 = int_neighbours;
+                            while (neigh_tmp2 != NULL)
                             {
-                                if(neigh_tmp->this->fd != neigh_aux->this->fd) 
+                                if(neigh_tmp2->this->fd != neigh_aux->this->fd) 
                                 {
-                                    writeTCP(neigh_tmp->this->fd, strlen(message_buffer), message_buffer);
+                                    writeTCP(neigh_tmp2->this->fd, strlen(message_buffer), message_buffer);
                                 }
-                                neigh_tmp = neigh_tmp->next;
+                                neigh_tmp2 = neigh_tmp2->next;
                             }
 
                             writeTCP(external->fd, strlen(message_buffer), message_buffer);
