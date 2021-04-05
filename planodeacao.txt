@@ -1,0 +1,22 @@
+1 -  criar ficheiro duvidaslab.txt no repositorio
+Colocar lá todas as duvidas em relação ao projeto
+
+2 - Fazer commit do id e rede alfanumerico, e retirar estado TWONODES
+
+3 (Pedro ) - Testar readTCP
+
+4 - Ler todos os return values das funções todas (writeTCP e readTCP), corrigir strerror e adiciona l:os. Procurar coisa de compilaçao do bispo de aed verifica return value unchecked
+
+5 - Escrever comentários em todas as funções nos header files (nos .c não é preciso)
+
+6 - Escrever dia e hora em que os ficheiros foram criados e autores no topo
+
+7 - Aula de lab
+
+7a - Tirar todas as duvidas com o prof
+
+7b - Começar a testar com ligação entre 2 computadores diferentes
+
+7c - Começar a testar com ligação com nós de outro grupo
+
+
