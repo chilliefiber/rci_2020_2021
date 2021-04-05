@@ -482,7 +482,6 @@ int main(int argc, char *argv[])
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
     udp_state = not_waiting;
-    char waiting_for_backup = 0;
     // lista de mensagens recebidas num readTCP
     messages *msg_list, *msg_aux;
     no self;
