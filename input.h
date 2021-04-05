@@ -23,6 +23,7 @@ int isPort(char port[]);
 
 int isName(char name[]);
 
+int countblankSpace(char terminal[]);
 
 
 
