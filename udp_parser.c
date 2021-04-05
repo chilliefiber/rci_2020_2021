@@ -60,12 +60,12 @@ void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
 // datagram é a mensagem recebida, terminada com \0
 // net é o número da rede para a qual estamos à espera de receber a lista dos nós
 // nodeslist_received é um booleano
-char* isNodesList(char* datagram, unsigned int net, char *nodeslist_received){
+char* isNodesList(char* datagram, char *net, char *nodeslist_received){
     char message_until_newline[100]; // passar o 100 para uma constante, depois passar o 100
     char message_supposed_to_recv[100];
     *nodeslist_received = 0;
     int error_flag;
-    error_flag = snprintf(message_supposed_to_recv, 100,  "NODESLIST %u\n", net);
+    error_flag = snprintf(message_supposed_to_recv, 100,  "NODESLIST %s\n", net);
     // na especificação do C em certo tipo de erros ele devolve NULL
     // segundo a man page. Talvez nao seja necessaria a verificação para
     // ser maior de 100, mas vi em https://www.cplusplus.com/reference/cstdio/snprintf/ 
