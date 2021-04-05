@@ -48,12 +48,12 @@ char* getParam(char *input)
 char *readCommand(enum instr *instr_code)
 {
 	char terminal[128], command[14], bootIP[NI_MAXHOST], bootTCP[NI_MAXSERV], second[64], id[64];
-    memset(terminal, 0, 128);
-    memset(command, 0, 14);
-    memset(bootIP, 0, NI_MAXHOST);
-    memset(bootTCP, 0, NI_MAXSERV);
-    memset(second, 0, 64);
-    memset(id, 0, 64);
+    	memset(terminal, 0, 128);
+    	memset(command, 0, 14);
+    	memset(bootIP, 0, NI_MAXHOST);
+    	memset(bootTCP, 0, NI_MAXSERV);
+    	memset(second, 0, 64);
+    	memset(id, 0, 64);
 	int size_input = 0;
 	
 	fgets(terminal,128,stdin);
@@ -68,44 +68,18 @@ char *readCommand(enum instr *instr_code)
 	
 	if(strcmp("join",command) == 0)
 	{
-        // tirar este
-        if (size_input == 4)
-        {
-            *instr_code = JOIN_SERVER_DOWN;
-            return getParam(terminal);
-        } 
-		if(size_input == 3)
+		if(size_input == 3 && (countblankSpace(terminal) == 2))
 		{
-			if(checkDigit(second) == 1 && checkDigit(id) == 1)
-			{
-				*instr_code = JOIN_ID;
-				return getParam(terminal);
-			}
-			if(checkDigit(second) != 1)
-			{
-				printf("Invalid net! Must be a digit!\n");
-			}
-			if(checkDigit(id) != 1)
-			{
-				printf("Invalid id! Must be a digit!\n");
-			}
-			
+		    *instr_code = JOIN_ID;
+			return getParam(terminal);
 		}
-		else if(size_input == 5)
+		else if(size_input == 5 && (countblankSpace(terminal) == 4))
 		{
-			if(checkDigit(second) == 1 && checkDigit(id) == 1 && isIP(bootIP) == 1 && isPort(bootTCP) == 1)
+			if(isIP(bootIP) == 1 && isPort(bootTCP) == 1)
 			{
 				*instr_code = JOIN_LINK;
 				
 				return getParam(terminal);
-			}
-			if(checkDigit(second) != 1)
-			{
-				printf("Invalid net! Must be a digit!\n");
-			}
-			if(checkDigit(id) != 1)
-			{
-				printf("Invalid id! Must be a digit!\n");
 			}
 			if(isIP(bootIP) != 1)
 			{
@@ -123,7 +97,7 @@ char *readCommand(enum instr *instr_code)
 	}
 	else if(strcmp("create",command) == 0)
 	{
-		if(size_input == 2)
+		if(size_input == 2 && (countblankSpace(terminal) == 1))
 		{
 			*instr_code = CREATE;
 		
@@ -136,7 +110,7 @@ char *readCommand(enum instr *instr_code)
 	}
 	else if(strcmp("get",command) == 0)
 	{
-		if(size_input == 2)
+		if(size_input == 2 && (countblankSpace(terminal) == 1))
 		{
 			if(isName(second) == 1)
 			{
@@ -156,7 +130,7 @@ char *readCommand(enum instr *instr_code)
 	}
 	else if((strcmp("show",command) == 0 && strcmp("topology",second) == 0) || strcmp("st",command) == 0)
 	{
-		if((size_input == 1 && strcmp("st",command) == 0) || (size_input == 2 && strcmp("show",command) == 0 && strcmp("topology",second) == 0))
+		if((size_input == 1 && !strcmp("st",command) && (countblankSpace(terminal) == 0)) || (size_input == 2 && !strcmp("show",command) && !strcmp("topology",second) && (countblankSpace(terminal) == 1)))
 		{
 			*instr_code = ST;
 		}
@@ -167,7 +141,7 @@ char *readCommand(enum instr *instr_code)
 	}
 	else if((strcmp("show",command) == 0 && strcmp("routing",second) == 0) || strcmp("sr",command) == 0)
 	{
-		if((size_input == 1 && strcmp("sr",command) == 0) || (size_input == 2 && strcmp("show",command) == 0 && strcmp("routing",second) == 0))
+		if((size_input == 1 && !strcmp("sr",command) && (countblankSpace(terminal) == 0)) || (size_input == 2 && !strcmp("show",command) && !strcmp("routing",second) && (countblankSpace(terminal) == 1)))
 		{
 			*instr_code = SR;
 		}
@@ -178,7 +152,7 @@ char *readCommand(enum instr *instr_code)
 	}
 	else if((strcmp("show",command) == 0 && strcmp("cache",second) == 0) || strcmp("sc",command) == 0)
 	{
-		if((size_input == 1 && strcmp("sc",command) == 0) || (size_input == 2 && strcmp("show",command) == 0 && strcmp("cache",second) == 0))
+		if((size_input == 1 && !strcmp("sc",command) && (countblankSpace(terminal) == 0)) || (size_input == 2 && !strcmp("show",command) && !strcmp("cache",second) && (countblankSpace(terminal) == 1)))
 		{
 			*instr_code = SC;
 		}
@@ -189,7 +163,7 @@ char *readCommand(enum instr *instr_code)
 	}
 	else if(strcmp("leave",command) == 0)
 	{
-		if(size_input == 1)
+		if(size_input == 1 && (countblankSpace(terminal) == 0))
 		{
 			*instr_code = LEAVE;
 		}
@@ -200,7 +174,7 @@ char *readCommand(enum instr *instr_code)
 	}
 	else if(strcmp("exit",command) == 0)
 	{
-		if(size_input == 1)
+		if(size_input == 1 && (countblankSpace(terminal) == 0))
 		{
 			*instr_code = EXIT;
 		}
@@ -251,7 +225,7 @@ int isPort(char port[])
   val = atoi(port);
   // verificar se porto está dentro dos limites permitidos, se sim 
   // retornar 1, se não retornar 0 e imprimir mensagem de erro
-  if(checkDigit(port) && val >= 1025 && val <= 65536)
+  if(checkDigit(port) && val >= 1025 && val <= 65535)
     return 1;	
 
   return 0;
@@ -259,19 +233,21 @@ int isPort(char port[])
 
 int isName(char name[])
 { 
-	char *token;
 	int i, count_point = 0;
 	
-	if(name[0] == '.')
+	if(name[0] == '.' && name[1] == '\n')
 	{
 		return 0;
 	}
 	
 	for(i=0; i<strlen(name); i++)
 	{
-		if(name[i] == '.' && i != strlen(name)-1)
+		if(i>0)
 		{
-			count_point++;
+			if((name[i] == '.' && name[i+1] != '\n') && (name[i] == '.' && name[i+1] != '\0'))
+			{
+				count_point++;
+			}
 		}
 	}
 	
@@ -280,16 +256,17 @@ int isName(char name[])
 		return 0;
 	}
 	
-	char *str_name = safeMalloc(strlen(name)+1);
-	strcpy(str_name,name);
-	token = strtok(str_name,".");
-	
-	if(checkDigit(token) == 1)
+	return 1;
+}
+
+int countblankSpace(char terminal[])
+{
+	int i, counter = 0;
+	for(i=0; terminal[i] != '\0'; i++)
 	{
-		free(str_name);
-		return 1;
+		if(terminal[i] == ' ')
+		counter++;
 	}
-	free(str_name);
-	return 0;
+	return counter;
 }
 
