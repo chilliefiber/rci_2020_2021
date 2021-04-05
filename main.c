@@ -23,7 +23,7 @@
 int N;
 
 typedef struct tab_entry{
-    int id_dest;
+    int *id_dest;
     int fd_sock;
     struct tab_entry *next;
 }tab_entry;
@@ -33,8 +33,8 @@ typedef struct cache_objects{
 }cache_objects;
 
 typedef struct no{
-    unsigned int net; //identificador da rede
-    int id;    //identificador do nó
+    char *net; //identificador da rede
+    int *id;    //identificador do nó
     char IP[NI_MAXHOST]; //endereço IP do nó
     char port[NI_MAXSERV]; //Porto TCP do nó
 }no;
@@ -50,12 +50,38 @@ typedef struct list_objects{
     struct list_objects *next;
 }list_objects;
 
-tab_entry *createinsertTabEntry(tab_entry *first_entry, int id_dst, int fd)
+char *getidfromName(char *user_input, char *id)
+{
+	int i, len = 0;
+        for(i=0; i<strlen(user_input); i++)
+        {
+	    if(i>0)
+	    {
+	        if(user_input[i] == '.')
+		{
+		    len = i;
+		    break;
+	        }
+	    }
+        }
+	
+        id = safeMalloc(len+1);
+        for(i=0; i<len; i++)
+        {
+	    id[i] = user_input[i];
+        }
+        id[len] = '\0';
+	
+        return id;
+}
+
+tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd)
 {
     tab_entry *tmp = first_entry;
     tab_entry *new_entry = safeMalloc(sizeof(tab_entry));
-    new_entry->next = NULL;	 // nova linha
-    new_entry->id_dest = id_dst;
+
+    new_entry->id_dest = safeMalloc(strlen(id_dst)+1);
+    strcpy(new_entry->id_dest, id_dst);
     new_entry->fd_sock = fd;
 
     if(first_entry == NULL)
@@ -76,14 +102,15 @@ tab_entry *createinsertTabEntry(tab_entry *first_entry, int id_dst, int fd)
     return first_entry;
 }
 
-void deleteTabEntryid(tab_entry **first_entry, int id_out)
+void deleteTabEntryid(tab_entry **first_entry, char *id_out)
 {
     tab_entry *tmp;
 
-    if((*first_entry)->id_dest == id_out)
+    if(!strcmp((*first_entry)->id_dest, id_out))
     {
         tmp = *first_entry; 
         *first_entry = (*first_entry)->next;
+	free(tmp->id_dest);
         free(tmp);
     }
     else
@@ -92,10 +119,11 @@ void deleteTabEntryid(tab_entry **first_entry, int id_out)
 
         while(curr->next != NULL)
         {
-            if(curr->next->id_dest == id_out)
+            if(!strcmp(curr->next->id_dest, id_out))
             {
                 tmp = curr->next;
                 curr->next = curr->next->next;
+		free(tmp->id_dest);
                 free(tmp);
                 break;
             }
@@ -113,6 +141,7 @@ void deleteTabEntryfd(tab_entry **first_entry, int fd_out)
     {
         tmp = *first_entry; 
         *first_entry = (*first_entry)->next;
+	free(tmp->id_dest);
         free(tmp);
     }
     else
@@ -125,6 +154,7 @@ void deleteTabEntryfd(tab_entry **first_entry, int fd_out)
             {
                 tmp = curr->next;
                 curr->next = curr->next->next;
+		free(tmp->id_dest);
                 free(tmp);
                 break;
             }
@@ -140,7 +170,7 @@ void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int 
 
     while(aux != NULL)
     {
-        errcode = snprintf(buffer, 150, "ADVERTISE %d\n",aux->id_dest);  
+        errcode = snprintf(buffer, 150, "ADVERTISE %s\n",aux->id_dest);  
         if (buffer == NULL || errcode < 0 || errcode >= 150)
         {
             // isto tá mal, o strncpy não afeta o errno!!
@@ -153,13 +183,13 @@ void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int 
     }
 }
 
-int checkTabEntry(tab_entry *first_entry, int id)
+int checkTabEntry(tab_entry *first_entry, char *id)
 {
     tab_entry *aux = first_entry;
 
     while(aux != NULL)
     {
-        if(aux->id_dest == id)
+        if(!strcmp(aux->id_dest, id))
         {
             return 1;
         }
@@ -174,7 +204,7 @@ void printTabExp(tab_entry *first_entry)
     printf("Routing Table:\n");
     while(aux != NULL)
     {
-        printf("%d, %d\n",aux->id_dest,aux->fd_sock);
+        printf("%s, %d\n",aux->id_dest,aux->fd_sock);
         aux = aux->next;
     }
 }
@@ -187,6 +217,7 @@ void FreeTabExp(tab_entry **first_entry)
     while(curr != NULL)
     {
         next = curr->next;
+	free(curr->id_dest);
         free(curr);
         curr = next;
     }
@@ -228,7 +259,7 @@ int checkObjectList(list_objects *head_obj, char *name)
     return 0;
 }
 
-list_objects *createinsertObject(list_objects *head, char *subname, int id)
+list_objects *createinsertObject(list_objects *head, char *subname, char *id)
 {
     int errcode;
     char *str;
@@ -236,7 +267,7 @@ list_objects *createinsertObject(list_objects *head, char *subname, int id)
 
     memset(str_id, 0, 150);
 
-    errcode = snprintf(str_id, 150, "%d.", id);
+    errcode = snprintf(str_id, 150, "%s.", id);
     if (str_id == NULL || errcode < 0 || errcode >= 150)
     {
         fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
@@ -422,9 +453,8 @@ int main(int argc, char *argv[])
     }
     // enum dos vários estados associados à rede de nós
     // NONODES no caso em que não existem nós
-    // TWONODES no caso em que a rede tem dois nós
     // MANYNODES no caso em que a rede tem mais que dois nós
-    enum {NONODES, ONENODE, TWONODES, MANYNODES} network_state;
+    enum {NONODES, ONENODE, MANYNODES} network_state;
     network_state = NONODES;
     node_list *nodes_fucking_list;
     fd_set rfds;
@@ -449,8 +479,6 @@ int main(int argc, char *argv[])
     tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
     cache_objects cache[N];
     int n_obj = 0;
-    char *token1, *str_name;
-    int ident;
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
     udp_state = not_waiting;
@@ -460,6 +488,8 @@ int main(int argc, char *argv[])
     no self;
     list_objects *head = NULL;
     int i;
+    char net[64], ident[64];
+    char *id =  NULL;
 
     struct sigaction act;
     // Protection against SIGPIPE signals 
@@ -547,15 +577,15 @@ int main(int argc, char *argv[])
                 external = new;
                 new = NULL;
                 printf("Estamos sozinhos numa rede\n");
-                network_state = TWONODES;
+                network_state = MANYNODES;
                 external_is_filled = 0;
                 // notar que apesar de estarmos em twonodes, não temos o external preenchido
                 // provavelmente temos de colocar aqui alguma flag acerca disso, nem que seja
                 // por causa do st, que vai ler do external que não está preenchido
             } 
-            // se este processo estava em modo TWONODES ou MANYNODES, alguém que nos contacta
+            // se este processo estava em modo MANYNODES, alguém que nos contacta
             // será mais um vizinho interno
-            else if (network_state == TWONODES || network_state == MANYNODES)
+            else if (network_state == MANYNODES)
             {
                 printf("Estamos numa rede com 2 ou mais nós. Alguém se ligou, vamos torná-lo um vizinho interno\n");
                 // isto é para o caso que está diretamente acima nos comentários, em que não temos os dados do external preenchidos
@@ -614,7 +644,7 @@ int main(int argc, char *argv[])
                             // dados no servidor de nós
 
                             // criar string para enviar o registo do nó
-                            errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.IP, self.port);  
+                            errcode = snprintf(message_buffer, 150, "REG %s %s %s", self.net, self.IP, self.port);  
                             if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                             {
                                 fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
@@ -678,7 +708,7 @@ int main(int argc, char *argv[])
                             neigh_aux = neigh_aux->next;
                         }
 
-                        first_entry = createinsertTabEntry(first_entry, atoi(arg1), external->fd);
+                        first_entry = createinsertTabEntry(first_entry, arg1, external->fd);
                     }
 
                     // para quando recebemos uma mensagem WITHDRAW do vizinho externo, reencaminhar esta mensagem para os nossos internos (se houverem)
@@ -691,26 +721,20 @@ int main(int argc, char *argv[])
                             writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
                             neigh_aux = neigh_aux->next;
                         }
-                        deleteTabEntryid(&first_entry, atoi(arg1));
+                        deleteTabEntryid(&first_entry, arg1);
                     }
 
                     //para quando recebemos uma mensagem INTEREST do vizinho externo
                     if (!strcmp(command, "INTEREST") && word_count == 2)
                     {
-                        token1 = NULL; 
-                        ident = 0;
-                        str_name = NULL;
-                        str_name = safeMalloc(strlen(arg1)+1); 
-                        strcpy(str_name,arg1);
-                        token1 = strtok(str_name,".");
-                        ident = atoi(token1);
-                        free(str_name);
+                        id = NULL;
+		        id = getidfromName(arg1, id);
 
                         // ativar flag_interest para o vizinho externo que nos mandou a mensagem de interesse
                         external->flag_interest = 1;
 
                         // verificar primeiro se o identificador do objeto corresponde ao nosso (se somos o destino da mensagem de interesse)    
-                        if(self.id == ident)
+                        if(!strcmp(self.id, id))
                         {
                             // caso seja igual verificamos se temos o objeto na nossa lista de objetos
                             if(checkObjectList(head, arg1) == 1)
@@ -767,7 +791,7 @@ int main(int argc, char *argv[])
                                 tab_aux = first_entry;
                                 while(tab_aux != NULL)
                                 {
-                                    if(tab_aux->id_dest == ident && tab_aux->fd_sock != SELFFD)
+                                    if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                                     {
                                         writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
                                     }
@@ -775,6 +799,7 @@ int main(int argc, char *argv[])
                                 }
                             }
                         }
+			free(id);
                     }
 
                     // para quando recebemos uma mensagem DATA do vizinho externo, primeiro armazenamos o objeto na cache de objetos
@@ -834,7 +859,7 @@ int main(int argc, char *argv[])
                     {
                         tab_tmp = tab_aux->next;
                         we_used_tab_tmp = 1;
-                        errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
+                        errcode = snprintf(message_buffer, 150, "WITHDRAW %s\n", tab_aux->id_dest);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
                             fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
@@ -1000,7 +1025,7 @@ int main(int argc, char *argv[])
 
                             writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
 
-                            first_entry = createinsertTabEntry(first_entry, atoi(arg1), neigh_aux->this->fd);
+                            first_entry = createinsertTabEntry(first_entry, arg1, neigh_aux->this->fd);
                         }
 
                         // para quando recebemos uma mensagem WITHDRAW de um interno, reencaminhar esta mensagem para os outros internos (se houverem), bem como ao nosso externo
@@ -1019,26 +1044,20 @@ int main(int argc, char *argv[])
 
                             writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
 
-                            deleteTabEntryid(&first_entry, atoi(arg1));
+                            deleteTabEntryid(&first_entry, arg1);
                         }
 
                         // para quando recebemos uma mensagem INTEREST dum vizinho interno
                         if (!strcmp(command, "INTEREST") && word_count == 2)
                         {
-                            token1 = NULL; 
-                            ident = 0;
-                            str_name = NULL;
-                            str_name = safeMalloc(strlen(arg1)+1); 
-                            strcpy(str_name,arg1);
-                            token1 = strtok(str_name,".");
-                            ident = atoi(token1);
-                            free(str_name);
+                            id = NULL;
+			    id = getidfromName(arg1, id);
 
                             // ativar flag_interest para o vizinho interno que nos mandou a mensagem de interesse
                             neigh_aux->this->flag_interest = 1;
 
                             // verificar primeiro se o identificador do objeto corresponde ao nosso (se somos o destino da mensagem de interesse)		
-                            if(self.id == ident)
+                            if(!strcmp(self.id, id))
                             {
                                 // caso seja igual verificamos se temos o objeto na nossa lista de objetos
                                 if(checkObjectList(head, arg1) == 1)
@@ -1095,7 +1114,7 @@ int main(int argc, char *argv[])
                                     tab_aux = first_entry;
                                     while(tab_aux != NULL)
                                     {
-                                        if(tab_aux->id_dest == ident && tab_aux->fd_sock != SELFFD)
+                                        if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                                         {
                                             writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
                                         }
@@ -1103,6 +1122,7 @@ int main(int argc, char *argv[])
                                     }
                                 }
                             }
+			    free(id);
                         }
 
                         // para quando recebemos uma mensagem DATA do vizinho interno, primeiro armazenamos o objeto na cache de objetos
@@ -1180,7 +1200,7 @@ int main(int argc, char *argv[])
                         {
                             tab_tmp = tab_aux->next;
                             we_used_tab_tmp = 1;
-                            errcode = snprintf(message_buffer, 150, "WITHDRAW %d\n", tab_aux->id_dest);  
+                            errcode = snprintf(message_buffer, 150, "WITHDRAW %s\n", tab_aux->id_dest);  
                             if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                             {
                                 fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
@@ -1266,12 +1286,7 @@ int main(int argc, char *argv[])
                     printf("We received the confirmation of registration from the server\n");
                     udp_state = not_waiting;
                     if (external)
-                        network_state = TWONODES; // aqui tem de perceber se está TWONODES ou MANYNODES. Pode ser pelo num_nodes 
-                    // ou olhando para o backup. Importante que podemos estar twonodes e na verdade haver mais, porque ao entrar
-                    // se so estiver la um no ficamos twonodes, e depois ao entrar 1 terceiro no que fica vizinho interno do
-                    // nó inicial não vamos saber dele. No entanto, quando tivermos a tabela de encaminhamento feita
-                    // podemos ver pelo numero de entradas que temos o numero de nos na rede, visto que vamos ter exatamente uma
-                    // entrada por cada no na rede
+                        network_state = MANYNODES; 
                     else
                         network_state = ONENODE;
                 }
@@ -1321,7 +1336,7 @@ int main(int argc, char *argv[])
                                 "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
 
                         waiting_for_backup = 1; // we're outnumbered, need backup
-                        network_state = TWONODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
+                        network_state = MANYNODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                         // quer dizer, podemos ver pelo num_nodes na verdade
 	     	        external->flag_interest = 0;
                         // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
@@ -1340,7 +1355,7 @@ int main(int argc, char *argv[])
 
                         external_is_filled = 1;
 
-                        errcode = snprintf(message_buffer, 150, "ADVERTISE %d\n",self.id);  
+                        errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n",self.id);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
                             // isto tá mal, o strncpy não afeta o errno!!
@@ -1357,7 +1372,7 @@ int main(int argc, char *argv[])
                     {
                         network_state = ONENODE; // to rule them all
                         // criar string para enviar o registo do nó
-                        errcode = snprintf(message_buffer, 150, "REG %u %s %s", self.net, self.IP, self.port);  
+                        errcode = snprintf(message_buffer, 150, "REG %s %s %s", self.net, self.IP, self.port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
                             fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
@@ -1377,16 +1392,27 @@ int main(int argc, char *argv[])
             user_input = readCommand(&instr_code);
             if (instr_code == JOIN_ID && network_state == NONODES)
             {
-                if(sscanf(user_input,"%u %d",&self.net,&self.id) != 2)
+		memset(net, 0, 64);
+		memset(ident, 0, 64);
+		self.net = NULL;
+		self.id = NULL;
+		    
+                if(sscanf(user_input,"%s %s", net, ident) != 2)
                 {
                     printf("Error in sscanf JOIN_ID\n");
                     exit(1);
                 }
+                
+                self.net = safeMalloc(strlen(net)+1);
+                strcpy(self.net, net);
+                self.id = safeMalloc(strlen(ident)+1);
+                strcpy(self.id, ident);
+		    
                 strncpy(self.IP, argv[1], NI_MAXHOST);
                 strncpy(self.port, argv[2], NI_MAXSERV);
 
                 // criar string para enviar o pedido de nós
-                errcode = snprintf(message_buffer, 150, "NODES %u", self.net);  
+                errcode = snprintf(message_buffer, 150, "NODES %s", self.net);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 100)
                 {
                     fprintf(stderr, "error in JOIN UDP message creation: %s\n", strerror(errno));
@@ -1398,17 +1424,27 @@ int main(int argc, char *argv[])
             }
             else if (instr_code == JOIN_LINK && network_state == NONODES)
             {
+		memset(net, 0, 64);
+		memset(ident, 0, 64);
+		self.net = NULL;
+		self.id = NULL;
                 // esta condição em princípio nunca será necessária
                 // visto que quando iniciamos o programa o external é colocado a NULL
                 // e quando fazemos LEAVE também. Portanto temos sempre de alocar memória
                 if (!external)
                     external = safeMalloc(sizeof(viz));
                 external_is_filled = 1;
-                if(sscanf(user_input,"%u %d %s %s",&self.net,&self.id, external->IP, external->port ) != 4)
+                if(sscanf(user_input,"%s %s %s %s", self.net, self.id, external->IP, external->port ) != 4)
                 {
                     printf("Error in sscanf JOIN_LINK\n");
                     exit(1);
                 }
+		 
+		self.net = safeMalloc(strlen(net)+1);
+                strcpy(self.net, net);
+                self.id = safeMalloc(strlen(ident)+1);
+                strcpy(self.id, ident);
+		    
                 strncpy(self.IP, argv[1], NI_MAXHOST);
                 strncpy(self.port, argv[2], NI_MAXSERV);
 
@@ -1418,7 +1454,7 @@ int main(int argc, char *argv[])
                         "Error getting address info for external node in JOIN_LINK\n", "Error connecting to external node in JOIN_LINK\n");
 
                 waiting_for_backup = 1; // we're outnumbered, need backup
-                network_state = TWONODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
+                network_state = MANYNODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                 // quer dizer, podemos ver pelo num_nodes na verdade
 		external->flag_interest = 0;
                 // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
@@ -1432,7 +1468,7 @@ int main(int argc, char *argv[])
 
                 first_entry = createinsertTabEntry(first_entry, self.id, SELFFD);
 
-                errcode = snprintf(message_buffer, 150, "ADVERTISE %d\n",self.id);  
+                errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n",self.id);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                 {
                     // isto tá mal, o strncpy não afeta o errno!!
@@ -1443,26 +1479,11 @@ int main(int argc, char *argv[])
 
                 writeTCP(external->fd, strlen(message_buffer), message_buffer);
             }
-            else if(instr_code == JOIN_SERVER_DOWN && network_state == NONODES)
-            {
-                network_state = ONENODE;
-                we_are_reg = 1;
-
-                if(sscanf(user_input,"%u %d",&self.net,&self.id) != 2)
-                {
-                    printf("Error in sscanf JOIN_LINK\n");
-                    exit(1);
-                }
-                strncpy(self.IP, argv[1], NI_MAXHOST);
-                strncpy(self.port, argv[2], NI_MAXSERV);
-
-                first_entry = createinsertTabEntry(first_entry, self.id, SELFFD);
-            }
             else if (instr_code == LEAVE && network_state != NONODES)
             {
                 we_are_reg = 0;
                 // criar string para enviar o desregisto (?isto é uma palavra) do nó
-                errcode = snprintf(message_buffer, 150, "UNREG %u %s %s", self.net, self.IP, self.port);  
+                errcode = snprintf(message_buffer, 150, "UNREG %s %s %s", self.net, self.IP, self.port);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                 {
                     fprintf(stderr, "error in UNREG UDP message creation: %s\n", strerror(errno));
@@ -1504,7 +1525,9 @@ int main(int argc, char *argv[])
                     free(neigh_aux);
                     neigh_aux = NULL;
                 }
-
+		    
+                free(self.net);
+		free(self.id);
                 FreeTabExp(&first_entry);
                 FreeObjectList(&head);
                 FreeCache(cache,n_obj);
@@ -1529,28 +1552,22 @@ int main(int argc, char *argv[])
 		    if(user_input[i] == ' ' || user_input[i] == '\n')
 		    user_input[i] = '\0';	
 		}
-                token1 = NULL; 
-                ident = 0;
-                str_name = safeMalloc(strlen(user_input)+1); 
-                strcpy(str_name,user_input);
-                token1 = strtok(str_name,".");
-                ident = atoi(token1);
-                //printf("%d\n%s\n",ident,token2);
-                //printf("%d\n",strlen(user_input));
-                free(str_name);
-
+                
+		id = NULL;
+		id = getidfromName(user_input, id);    
+		    
                 if(checkCache(cache, user_input, n_obj) == 1)
                 {
                     printf("Object %s found in our own cache!\n", user_input);
                 }
                 else
                 {
-                    if(checkTabEntry(first_entry,ident) == 1)
+                    if(checkTabEntry(first_entry,id) == 1)
                     {
                         tab_aux = first_entry;
                         while(tab_aux != NULL)
                         {
-                            if(tab_aux->id_dest == ident && tab_aux->fd_sock == SELFFD)
+                            if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock == SELFFD)
                             {
                                 if(checkObjectList(head, user_input) == 1)
                                 {
@@ -1561,7 +1578,7 @@ int main(int argc, char *argv[])
                                     printf("Object %s not found in our own list of objects!\n", user_input);
                                 }
                             }
-                            if(tab_aux->id_dest == ident && tab_aux->fd_sock != SELFFD)
+                            if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                             {
                                 errcode = snprintf(message_buffer, 150, "INTEREST %s\n", user_input);  
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -1579,9 +1596,10 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-                        printf("Node with the identifier %d does not exist in the network!\n",ident);
+                        printf("Node with the identifier %d does not exist in the network %s!\n",id, self.net);
                     }
-                }    
+                }
+		free(id);
             }
             else if(instr_code == EXIT)
                 exit(0);
@@ -1590,17 +1608,7 @@ int main(int argc, char *argv[])
                 if (network_state == NONODES)
                     printf("We're not connected to any network\n");
                 else if (network_state == ONENODE)
-                    printf("We're alone in a network\n");
-                else if (network_state == TWONODES)
-                {
-                    printf("State is TWONODES\n");
-                    printf("Is internal_neighbours null: %s\n", int_neighbours?"no":"yes");
-                    printf("External neighbour's contact: %s:%s\n", external->IP, external->port);
-                    if (!waiting_for_backup)
-                        printf("Backup's contact: %s:%s\n", backup->IP, backup->port);
-                    else 
-                        printf("We are still waiting for the contact information of our backup node\n");
-                }
+                    printf("We're alone in network %s!\n", self.net);           
                 else if (network_state == MANYNODES)
                 {
                     printf("State is MANYNODES\n");
@@ -1630,7 +1638,7 @@ int main(int argc, char *argv[])
             }
             else if(network_state != NONODES && (instr_code == JOIN_ID || instr_code == JOIN_LINK))
             {
-                printf("We're already connected to a network\n");
+                printf("We're already connected to network %s!\n",self.net);
             }
             free(user_input);
         }
