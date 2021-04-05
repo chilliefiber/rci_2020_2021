@@ -23,7 +23,7 @@
 int N;
 
 typedef struct tab_entry{
-    int *id_dest;
+    char *id_dest;
     int fd_sock;
     struct tab_entry *next;
 }tab_entry;
@@ -34,7 +34,7 @@ typedef struct cache_objects{
 
 typedef struct no{
     char *net; //identificador da rede
-    int *id;    //identificador do nó
+    char *id;    //identificador do nó
     char IP[NI_MAXHOST]; //endereço IP do nó
     char port[NI_MAXSERV]; //Porto TCP do nó
 }no;
@@ -1596,7 +1596,7 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-                        printf("Node with the identifier %d does not exist in the network %s!\n",id, self.net);
+                        printf("Node with the identifier %s does not exist in the network %s!\n", id, self.net);
                     }
                 }
 		free(id);
