@@ -50,357 +50,41 @@ typedef struct list_objects{
     struct list_objects *next;
 }list_objects;
 
-char *getidfromName(char *user_input, char *id)
-{
-	int i, len = 0;
-        for(i=0; i<strlen(user_input); i++)
-        {
-	    if(i>0)
-	    {
-	        if(user_input[i] == '.')
-		{
-		    len = i;
-		    break;
-	        }
-	    }
-        }
-	
-        id = safeMalloc(len+1);
-        for(i=0; i<len; i++)
-        {
-	    id[i] = user_input[i];
-        }
-        id[len] = '\0';
-	
-        return id;
-}
+char *getidfromName(char *user_input, char *id);
 
-tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd)
-{
-    tab_entry *tmp = first_entry;
-    tab_entry *new_entry = safeMalloc(sizeof(tab_entry));
+tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd);
 
-    new_entry->id_dest = safeMalloc(strlen(id_dst)+1);
-    strcpy(new_entry->id_dest, id_dst);
-    new_entry->fd_sock = fd;
+void deleteTabEntryid(tab_entry **first_entry, char *id_out);
 
-    if(first_entry == NULL)
-    {
-        first_entry = new_entry;
-        new_entry->next = NULL;
-    }
-    else
-    {
-        while(tmp->next != NULL)
-        {
-            tmp = tmp->next;
-        }
-        tmp->next = new_entry;
-        new_entry->next = NULL;
-    }
+void deleteTabEntryfd(tab_entry **first_entry, int fd_out);
 
-    return first_entry;
-}
+void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int fd);
 
-void deleteTabEntryid(tab_entry **first_entry, char *id_out)
-{
-    tab_entry *tmp;
+int checkTabEntry(tab_entry *first_entry, char *id);
 
-    if(!strcmp((*first_entry)->id_dest, id_out))
-    {
-        tmp = *first_entry; 
-        *first_entry = (*first_entry)->next;
-	free(tmp->id_dest);
-        free(tmp);
-    }
-    else
-    {
-        tab_entry *curr = *first_entry;
+void printTabExp(tab_entry *first_entry);
 
-        while(curr->next != NULL)
-        {
-            if(!strcmp(curr->next->id_dest, id_out))
-            {
-                tmp = curr->next;
-                curr->next = curr->next->next;
-		free(tmp->id_dest);
-                free(tmp);
-                break;
-            }
-            else
-                curr = curr->next;
-        }
-    }
-}
+void FreeTabExp(tab_entry **first_entry);
 
-void deleteTabEntryfd(tab_entry **first_entry, int fd_out)
-{
-    tab_entry *tmp;
+char *getConcatString( const char *str1, const char *str2);
 
-    if((*first_entry)->fd_sock == fd_out)
-    {
-        tmp = *first_entry; 
-        *first_entry = (*first_entry)->next;
-	free(tmp->id_dest);
-        free(tmp);
-    }
-    else
-    {
-        tab_entry *curr = *first_entry;
+int checkObjectList(list_objects *head_obj, char *name);
 
-        while(curr->next != NULL)
-        {
-            if(curr->next->fd_sock == fd_out)
-            {
-                tmp = curr->next;
-                curr->next = curr->next->next;
-		free(tmp->id_dest);
-                free(tmp);
-                break;
-            }
-            else
-                curr = curr->next;
-        }
-    }
-}
+list_objects *createinsertObject(list_objects *head, char *subname, char *id);
 
-void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int fd)
-{
-    tab_entry *aux = first_entry;
+void printObjectList(list_objects *head_obj);
 
-    while(aux != NULL)
-    {
-        errcode = snprintf(buffer, 150, "ADVERTISE %s\n",aux->id_dest);  
-        if (buffer == NULL || errcode < 0 || errcode >= 150)
-        {
-            // isto tá mal, o strncpy não afeta o errno!!
-            // deixo por agora para me lembrar de mudar em todos
-            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
-            exit(-1);  
-        }
-        writeTCP(fd, strlen(buffer), buffer);
-        aux = aux->next;
-    }
-}
+void FreeObjectList(list_objects **head_obj);
 
-int checkTabEntry(tab_entry *first_entry, char *id)
-{
-    tab_entry *aux = first_entry;
+int checkCache(cache_objects cache[N], char *name, int n_obj);
 
-    while(aux != NULL)
-    {
-        if(!strcmp(aux->id_dest, id))
-        {
-            return 1;
-        }
-        aux = aux->next;
-    }
-    return 0;
-}
+int saveinCache(cache_objects cache[N], char *name, int n_obj);
 
-void printTabExp(tab_entry *first_entry)
-{
-    tab_entry *aux = first_entry;
-    printf("Routing Table:\n");
-    while(aux != NULL)
-    {
-        printf("%s, %d\n",aux->id_dest,aux->fd_sock);
-        aux = aux->next;
-    }
-}
+void printCache(cache_objects cache[N], int n_obj);
 
-void FreeTabExp(tab_entry **first_entry)
-{
-    tab_entry *curr = *first_entry;
-    tab_entry *next;
+void FreeCache(cache_objects cache[N], int n_obj);
 
-    while(curr != NULL)
-    {
-        next = curr->next;
-	free(curr->id_dest);
-        free(curr);
-        curr = next;
-    }
-
-    *first_entry = NULL;
-}
-
-char *getConcatString( const char *str1, const char *str2 ) 
-{
-    char *finalString = NULL;
-    size_t n = 0;
-
-    if ( str1 ) n += strlen( str1 );
-    if ( str2 ) n += strlen( str2 );
-
-    if ( ( str1 || str2 ) && ( finalString = malloc( n + 1 ) ) != NULL )
-    {
-        *finalString = '\0';
-
-        if ( str1 ) strcpy( finalString, str1 );
-        if ( str2 ) strcat( finalString, str2 );
-    }
-
-    return finalString;
-}
-
-int checkObjectList(list_objects *head_obj, char *name)
-{
-    list_objects *aux = head_obj;
-    
-    while(aux != NULL)
-    {
-        if(!strcmp(aux->objct, name))
-        {
-            return 1;
-        }
-        aux = aux->next;
-    }
-    return 0;
-}
-
-list_objects *createinsertObject(list_objects *head, char *subname, char *id)
-{
-    int errcode;
-    char *str;
-    char str_id[150];
-
-    memset(str_id, 0, 150);
-
-    errcode = snprintf(str_id, 150, "%s.", id);
-    if (str_id == NULL || errcode < 0 || errcode >= 150)
-    {
-        fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
-        exit(-1);
-    }
-
-    str = getConcatString(str_id, subname);
-
-    if(checkObjectList(head,str) == 1)
-    {
-        printf("Object %s already exists in our own list of objects!\n", str);
-    }
-    else
-    {
-	list_objects *tmp = head;
-        list_objects *new_obj = safeMalloc(sizeof(list_objects));
-        new_obj->objct = safeMalloc(strlen(str)+1);
-        // INSEGURO
-        strcpy(new_obj->objct, str);
-
-        if(head == NULL)
-        {
-            head = new_obj;
-            new_obj->next = NULL;
-        }
-        else
-        {
-            while(tmp->next != NULL)
-            {
-                tmp = tmp->next;
-            }
-            tmp->next = new_obj;
-            new_obj->next = NULL;
-        } 
-    }
-    free(str);
-    return head;
-}
-
-void printObjectList(list_objects *head_obj)
-{
-    list_objects *aux = head_obj;
-    printf("List of objects:\n");
-    while(aux != NULL)
-    {
-        printf("%s\n",aux->objct);
-        aux = aux->next;
-    }
-}
-
-void FreeObjectList(list_objects **head_obj)
-{
-    list_objects *curr = *head_obj;
-    list_objects *next;
-
-    while(curr != NULL)
-    {
-        next = curr->next;
-        free(curr->objct);
-        free(curr);
-        curr = next;
-    }
-
-    *head_obj = NULL;
-}
-
-int checkCache(cache_objects cache[N], char *name, int n_obj)
-{
-    int i;
-
-    for(i=0; i<n_obj; i++)
-    {
-        if(strcmp(cache[i].obj, name) == 0)
-        {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-int saveinCache(cache_objects cache[N], char *name, int n_obj)
-{
-    int i;
-	
-    if(n_obj > N)
-    {
-        for(i=0; i<N-1; i++)
-	{
-            free(cache[i].obj);	
-            cache[i].obj = NULL;
-	    cache[i].obj = safeMalloc(strlen(cache[i+1].obj)+1);
-            strcpy(cache[i].obj, cache[i+1].obj);
-        }
-	free(cache[i].obj);
-   	n_obj--;	
-    }
-
-    cache[n_obj-1].obj = NULL;
-    cache[n_obj-1].obj = safeMalloc(strlen(name)+1);
-    strcpy(cache[n_obj-1].obj, name);
-	
-    return n_obj;
-}
-
-void printCache(cache_objects cache[N], int n_obj)
-{
-    int i;
-    printf("Cache\nNº Objetos armazenados: %d\n",n_obj);
-    for(i=0; i<n_obj; i++)
-    {
-        printf("%s\n",cache[i].obj);
-    }
-}
-
-void FreeCache(cache_objects cache[N], int n_obj)
-{
-    int i;
-	
-    for(i=0; i<n_obj; i++)
-    {
-        free(cache[i].obj);
-	cache[i].obj = NULL;
-    }
-}
-
-void addToList(internals **int_neighbours, viz *new)
-{
-    internals *aux = *int_neighbours;
-    *int_neighbours = safeMalloc(sizeof(internals));
-    (*int_neighbours)->this = new;
-    (*int_neighbours)->this->flag_interest = 0;
-    (*int_neighbours)->next = aux;
-}
+void addToList(internals **int_neighbours, viz *new);
 
 int main(int argc, char *argv[])
 {
@@ -632,7 +316,7 @@ int main(int argc, char *argv[])
                     // fez leave e o nosso vizinho externo se ligou ao seu backup, atualizando o nosso backup
                     if (!strcmp(command, "EXTERN") && word_count == 3)
                     {
-                        waiting_for_backup = 0;
+                        //waiting_for_backup = 0;
                         printf("Just received the backup data\n");
                         strncpy(backup->IP, arg1, NI_MAXHOST);
                         strncpy(backup->port, arg2, NI_MAXSERV);
@@ -952,7 +636,7 @@ int main(int argc, char *argv[])
                         exit(-1);
                     }
                     writeTCP(external->fd, strlen(message_buffer), message_buffer);
-                    waiting_for_backup = 1; // we're outnumbered, need backup
+                    //waiting_for_backup = 1; // we're outnumbered, need backup
 		    external->flag_interest = 0;
                     //se tivermos internos que não sabem ainda que o nosso externo (o seu backup) mudou, notificá-los através da mensagem EXTERN
                     if(int_neighbours)
@@ -1334,7 +1018,7 @@ int main(int argc, char *argv[])
                         connectTCP(nodes_fucking_list->IP, nodes_fucking_list->port, external->fd, 
                                 "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
 
-                        waiting_for_backup = 1; // we're outnumbered, need backup
+                        //waiting_for_backup = 1; // we're outnumbered, need backup
                         network_state = MANYNODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                         // quer dizer, podemos ver pelo num_nodes na verdade
 	     	        external->flag_interest = 0;
@@ -1452,7 +1136,7 @@ int main(int argc, char *argv[])
                 connectTCP(external->IP, external->port, external->fd, 
                         "Error getting address info for external node in JOIN_LINK\n", "Error connecting to external node in JOIN_LINK\n");
 
-                waiting_for_backup = 1; // we're outnumbered, need backup
+                //waiting_for_backup = 1; // we're outnumbered, need backup
                 network_state = MANYNODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                 // quer dizer, podemos ver pelo num_nodes na verdade
 		external->flag_interest = 0;
@@ -1643,4 +1327,358 @@ int main(int argc, char *argv[])
         }
     }	
     return 0;
+}
+
+
+char *getidfromName(char *user_input, char *id)
+{
+	int i, len = 0;
+        for(i=0; i<strlen(user_input); i++)
+        {
+	    if(i>0)
+	    {
+	        if(user_input[i] == '.')
+		{
+		    len = i;
+		    break;
+	        }
+	    }
+        }
+	
+        id = safeMalloc(len+1);
+        for(i=0; i<len; i++)
+        {
+	    id[i] = user_input[i];
+        }
+        id[len] = '\0';
+	
+        return id;
+}
+
+
+tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd)
+{
+    tab_entry *tmp = first_entry;
+    tab_entry *new_entry = safeMalloc(sizeof(tab_entry));
+
+    new_entry->id_dest = safeMalloc(strlen(id_dst)+1);
+    strcpy(new_entry->id_dest, id_dst);
+    new_entry->fd_sock = fd;
+
+    if(first_entry == NULL)
+    {
+        first_entry = new_entry;
+        new_entry->next = NULL;
+    }
+    else
+    {
+        while(tmp->next != NULL)
+        {
+            tmp = tmp->next;
+        }
+        tmp->next = new_entry;
+        new_entry->next = NULL;
+    }
+
+    return first_entry;
+}
+
+void deleteTabEntryid(tab_entry **first_entry, char *id_out)
+{
+    tab_entry *tmp;
+
+    if(!strcmp((*first_entry)->id_dest, id_out))
+    {
+        tmp = *first_entry; 
+        *first_entry = (*first_entry)->next;
+	free(tmp->id_dest);
+        free(tmp);
+    }
+    else
+    {
+        tab_entry *curr = *first_entry;
+
+        while(curr->next != NULL)
+        {
+            if(!strcmp(curr->next->id_dest, id_out))
+            {
+                tmp = curr->next;
+                curr->next = curr->next->next;
+		free(tmp->id_dest);
+                free(tmp);
+                break;
+            }
+            else
+                curr = curr->next;
+        }
+    }
+}
+
+void deleteTabEntryfd(tab_entry **first_entry, int fd_out)
+{
+    tab_entry *tmp;
+
+    if((*first_entry)->fd_sock == fd_out)
+    {
+        tmp = *first_entry; 
+        *first_entry = (*first_entry)->next;
+	free(tmp->id_dest);
+        free(tmp);
+    }
+    else
+    {
+        tab_entry *curr = *first_entry;
+
+        while(curr->next != NULL)
+        {
+            if(curr->next->fd_sock == fd_out)
+            {
+                tmp = curr->next;
+                curr->next = curr->next->next;
+		free(tmp->id_dest);
+                free(tmp);
+                break;
+            }
+            else
+                curr = curr->next;
+        }
+    }
+}
+
+void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int fd)
+{
+    tab_entry *aux = first_entry;
+
+    while(aux != NULL)
+    {
+        errcode = snprintf(buffer, 150, "ADVERTISE %s\n",aux->id_dest);  
+        if (buffer == NULL || errcode < 0 || errcode >= 150)
+        {
+            // isto tá mal, o strncpy não afeta o errno!!
+            // deixo por agora para me lembrar de mudar em todos
+            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+            exit(-1);  
+        }
+        writeTCP(fd, strlen(buffer), buffer);
+        aux = aux->next;
+    }
+}
+
+int checkTabEntry(tab_entry *first_entry, char *id)
+{
+    tab_entry *aux = first_entry;
+
+    while(aux != NULL)
+    {
+        if(!strcmp(aux->id_dest, id))
+        {
+            return 1;
+        }
+        aux = aux->next;
+    }
+    return 0;
+}
+
+void printTabExp(tab_entry *first_entry)
+{
+    tab_entry *aux = first_entry;
+    printf("Routing Table:\n");
+    while(aux != NULL)
+    {
+        printf("%s, %d\n",aux->id_dest,aux->fd_sock);
+        aux = aux->next;
+    }
+}
+
+void FreeTabExp(tab_entry **first_entry)
+{
+    tab_entry *curr = *first_entry;
+    tab_entry *next;
+
+    while(curr != NULL)
+    {
+        next = curr->next;
+	free(curr->id_dest);
+        free(curr);
+        curr = next;
+    }
+
+    *first_entry = NULL;
+}
+
+char *getConcatString( const char *str1, const char *str2 ) 
+{
+    char *finalString = NULL;
+    size_t n = 0;
+
+    if ( str1 ) n += strlen( str1 );
+    if ( str2 ) n += strlen( str2 );
+
+    if ( ( str1 || str2 ) && ( finalString = malloc( n + 1 ) ) != NULL )
+    {
+        *finalString = '\0';
+
+        if ( str1 ) strcpy( finalString, str1 );
+        if ( str2 ) strcat( finalString, str2 );
+    }
+
+    return finalString;
+}
+
+int checkObjectList(list_objects *head_obj, char *name)
+{
+    list_objects *aux = head_obj;
+    
+    while(aux != NULL)
+    {
+        if(!strcmp(aux->objct, name))
+        {
+            return 1;
+        }
+        aux = aux->next;
+    }
+    return 0;
+}
+
+list_objects *createinsertObject(list_objects *head, char *subname, char *id)
+{
+    int errcode;
+    char *str;
+    char str_id[150];
+
+    memset(str_id, 0, 150);
+
+    errcode = snprintf(str_id, 150, "%s.", id);
+    if (str_id == NULL || errcode < 0 || errcode >= 150)
+    {
+        fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
+        exit(-1);
+    }
+
+    str = getConcatString(str_id, subname);
+
+    if(checkObjectList(head,str) == 1)
+    {
+        printf("Object %s already exists in our own list of objects!\n", str);
+    }
+    else
+    {
+	list_objects *tmp = head;
+        list_objects *new_obj = safeMalloc(sizeof(list_objects));
+        new_obj->objct = safeMalloc(strlen(str)+1);
+        // INSEGURO
+        strcpy(new_obj->objct, str);
+
+        if(head == NULL)
+        {
+            head = new_obj;
+            new_obj->next = NULL;
+        }
+        else
+        {
+            while(tmp->next != NULL)
+            {
+                tmp = tmp->next;
+            }
+            tmp->next = new_obj;
+            new_obj->next = NULL;
+        } 
+    }
+    free(str);
+    return head;
+}
+
+void printObjectList(list_objects *head_obj)
+{
+    list_objects *aux = head_obj;
+    printf("List of objects:\n");
+    while(aux != NULL)
+    {
+        printf("%s\n",aux->objct);
+        aux = aux->next;
+    }
+}
+
+void FreeObjectList(list_objects **head_obj)
+{
+    list_objects *curr = *head_obj;
+    list_objects *next;
+
+    while(curr != NULL)
+    {
+        next = curr->next;
+        free(curr->objct);
+        free(curr);
+        curr = next;
+    }
+
+    *head_obj = NULL;
+}
+
+int checkCache(cache_objects cache[N], char *name, int n_obj)
+{
+    int i;
+
+    for(i=0; i<n_obj; i++)
+    {
+        if(strcmp(cache[i].obj, name) == 0)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int saveinCache(cache_objects cache[N], char *name, int n_obj)
+{
+    int i;
+	
+    if(n_obj > N)
+    {
+        for(i=0; i<N-1; i++)
+	{
+            free(cache[i].obj);	
+            cache[i].obj = NULL;
+	    cache[i].obj = safeMalloc(strlen(cache[i+1].obj)+1);
+            strcpy(cache[i].obj, cache[i+1].obj);
+        }
+	free(cache[i].obj);
+   	n_obj--;	
+    }
+
+    cache[n_obj-1].obj = NULL;
+    cache[n_obj-1].obj = safeMalloc(strlen(name)+1);
+    strcpy(cache[n_obj-1].obj, name);
+	
+    return n_obj;
+}
+
+void printCache(cache_objects cache[N], int n_obj)
+{
+    int i;
+    printf("Cache\nNº Objetos armazenados: %d\n",n_obj);
+    for(i=0; i<n_obj; i++)
+    {
+        printf("%s\n",cache[i].obj);
+    }
+}
+
+void FreeCache(cache_objects cache[N], int n_obj)
+{
+    int i;
+	
+    for(i=0; i<n_obj; i++)
+    {
+        free(cache[i].obj);
+	cache[i].obj = NULL;
+    }
+}
+
+void addToList(internals **int_neighbours, viz *new)
+{
+    internals *aux = *int_neighbours;
+    *int_neighbours = safeMalloc(sizeof(internals));
+    (*int_neighbours)->this = new;
+    (*int_neighbours)->this->flag_interest = 0;
+    (*int_neighbours)->next = aux;
 }
