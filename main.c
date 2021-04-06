@@ -22,12 +22,14 @@
 #define SELFFD -1
 int N;
 
+// tabela de expedição 
 typedef struct tab_entry{
     char *id_dest;
     int fd_sock;
     struct tab_entry *next;
 }tab_entry;
 
+// estrutura para um slot da cache dos objetos
 typedef struct cache_objects{
     char *obj;
 }cache_objects;
@@ -39,12 +41,13 @@ typedef struct no{
     char port[NI_MAXSERV]; //Porto TCP do nó
 }no;
 
-//lista dos vizinhos internos do nó
+// lista dos vizinhos internos do nó
 typedef struct internals{
     struct viz *this;
     struct internals *next;
 }internals;
 
+// lista de objetos nomeados do nó
 typedef struct list_objects{
     char *objct;
     struct list_objects *next;
@@ -58,41 +61,109 @@ typedef struct list_objects{
 char *getidfromName(char *user_input, char *id);
 
 /**
-* createinsertTabEntry: função que cria uma entrada na tabela de expedição (basicamente cria e adiciona um nó a lista simplesmente ligada) 
+* createinsertTabEntry: função que cria uma entrada na tabela de expedição (basicamente cria e adiciona um nó a lista simplesmente ligada) e retorna o topo da lista atualizado no final
 * \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
 * \param id_dst: ponteiro para a string correspondente ao identificador do nó destino correspondente à entrada da tabela que se vai adicionar
 * \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP que nos permite chegar ào nó destino 
 */
 tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd);
 
+/**
+* deleteTabEntryid: função que recebe como argumento o id do nó e que e elimina a respetiva entrada da tabela de expedição (basicamente deleta um nó da lista simplesmente ligada) 
+* \param first_entry: duplo ponteiro para a primeira entrada da tabela de expedição (topo da lista)
+* \param id_out: ponteiro para a string correspondente ao identificador do nó cuja entrada correspondente vai ser eliminada
+*/
 void deleteTabEntryid(tab_entry **first_entry, char *id_out);
 
+/**
+* deleteTabEntryfd: função que recebe como argumento o fd do nó e que e elimina a respetiva entrada da tabela de expedição (basicamente deleta um nó da lista simplesmente ligada) 
+* \param first_entry: duplo ponteiro para a primeira entrada da tabela de expedição (topo da lista)
+* \param fd_out: inteiro correspondente ao file descriptor que está associado à sessão TCP que nos permitia chegar ào nó destino, a entrada correspondente vai ser eliminada
+*/
 void deleteTabEntryfd(tab_entry **first_entry, int fd_out);
 
+/** writeAdvtoEntryNode: função que escreve tantas mensagens ADVERTISE quantas as entradas existentes na tabela de expedição
+* \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
+* \param errcode: inteiro utilizado para verificação de erro na conversão do snprintf()
+* \param buffer: ponteiro para string onde será armazenada a mensagem que será enviada por TCP
+* \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP que nos permite chegar ào nó destino 
+*/
 void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int fd);
 
+/** checkTabEntry: função que verifica se existe na tabela de expedição uma entrada com o identificador id (importante para pesquisa de objetos nomeados)
+* \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
+* \param id: ponteiro para a string correspondente ao identificador do nó
+* \retorna 1 se existir a entrada na tabela e retorna 0 caso não exista
+*/
 int checkTabEntry(tab_entry *first_entry, char *id);
 
+/** printTabExp: função que imprime a tabela de expedição do nó da aplicação
+* \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
+*/
 void printTabExp(tab_entry *first_entry);
 
+/** FreeTabExp: função que liberta a tabela de expedição (desaloca a memória alocada pelas entradas)
+* \param first_entry: duplo ponteiro para a primeira entrada da tabela de expedição (topo da lista)
+*/
 void FreeTabExp(tab_entry **first_entry);
 
+/** getConcatString: função que concatena duas strings numa só e retorna no final o ponteiro para string resultante (utilizada na criação de objetos para juntar id ao subnome)
+* \param str1: ponteiro para a primeira string (corresponderá ao identificador do nó)
+* \param str2: ponteiro para a segunda string (corresponderá ao subnome do objeto)
+*/
 char *getConcatString( const char *str1, const char *str2);
 
+/** checkObjectList: função que verifica se existe um determinado objeto na lista de objetos nomeados do nó (importante para pesquisa de objetos nomeados)
+* \param head_obj: ponteiro para o primeiro objeto da lista de objetos (topo da lista)
+* \param name: ponteiro para a string correspondente ao nome do objeto a verificar
+* \retorna 1 se existir o objeto na lista e retorna 0 caso não exista
+*/
 int checkObjectList(list_objects *head_obj, char *name);
 
+/**
+* createinsertObject: função que cria um objeto e adiciona a lista de objetos nomeados do nó (basicamente cria e adiciona um nó a lista simplesmente ligada) e retorna o topo da lista atualizado no final
+* \param head: ponteiro para o primeiro objeto da lista de objetos (topo da lista)
+* \param subname: ponteiro para a string correspondente ao subnome do objeto introduzido no comando "create"
+* \param id: ponteiro para a string correspondente ao identificador do nó da aplicação 
+*/
 list_objects *createinsertObject(list_objects *head, char *subname, char *id);
 
+/** printTabExp: função que imprime a lista de objetos nomeados do nó da aplicação
+* \param head_obj: ponteiro para o primeiro objeto da lista de objetos (topo da lista)
+*/
 void printObjectList(list_objects *head_obj);
 
+/** FreeObjectList: função que liberta a lista de objetos nomeados (desaloca a memória alocada pelos objetos(nós) da lista)
+* \param head_obj: duplo ponteiro para o primeiro objeto da lista de objetos (topo da lista)
+*/
 void FreeObjectList(list_objects **head_obj);
 
+/** checkCache: função que verifica se existe um determinado objeto na cache do nó (importante para pesquisa de objetos nomeados)
+* \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dso objetos em slots da cache
+* \param name: ponteiro para a string correspondente ao nome do objeto a verificar
+* \param n_obj: inteiro correspondente ao número de objetos presentes na cache
+* \retorna 1 se existir o objeto na cache e retorna 0 caso não exista
+*/
 int checkCache(cache_objects cache[N], char *name, int n_obj);
 
+/** saveinCache: função que guarda um determinado objeto na cache do nó (importante para pesquisa de objetos nomeados), estando implementado o método Least Recently Used
+* \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dos objetos em slots na cache
+* \param name: ponteiro para a string correspondente ao nome do objeto a verificar
+* \param n_obj: inteiro correspondente ao número de objetos presentes na cache
+* \retorna 1 se existir o objeto na cache e retorna 0 caso não exista
+*/
 int saveinCache(cache_objects cache[N], char *name, int n_obj);
 
+/** printTabExp: função que imprime os objetos que se encontram na cache do nó da aplicação
+* \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dos objetos em slots na cache
+* \param n_obj: inteiro correspondente ao número de objetos presentes na cache
+*/
 void printCache(cache_objects cache[N], int n_obj);
 
+/** FreeCache: função que liberta a cache (desaloca a memória alocada nas várias posições da cache correpondente as strings dos objetos)
+* \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dos objetos em slots na cache
+* \param n_obj: inteiro correspondente ao número de objetos presentes na cache
+*/
 void FreeCache(cache_objects cache[N], int n_obj);
 
 void addToList(internals **int_neighbours, viz *new);
