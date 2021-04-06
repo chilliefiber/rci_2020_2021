@@ -50,8 +50,19 @@ typedef struct list_objects{
     struct list_objects *next;
 }list_objects;
 
+/**
+* getidfromName: função que extrai do nome introduzido pelo comando "get" o ientificador do nó destino para a pesquisa do objeto
+* \param user_input: ponteiro para a string correspondente ao nome introduzido pelo comando "get"
+* \param id: ponteiro para a string correspondente ao identificador do nó que será retornado no final desta função
+*/
 char *getidfromName(char *user_input, char *id);
 
+/**
+* createinsertTabEntry: função que cria uma entrada na tabela de expedição (basicamente cria e adiciona um nó a lista simplesmente ligada) 
+* \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
+* \param id_dst: ponteiro para a string correspondente ao identificador do nó destino correspondente à entrada da tabela que se vai adicionar
+* \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP que nos permite chegar ào nó destino 
+*/
 tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd);
 
 void deleteTabEntryid(tab_entry **first_entry, char *id_out);
@@ -1328,7 +1339,6 @@ int main(int argc, char *argv[])
     }	
     return 0;
 }
-
 
 char *getidfromName(char *user_input, char *id)
 {
