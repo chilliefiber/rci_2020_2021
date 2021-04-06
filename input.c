@@ -92,7 +92,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format! Commands: join net id, join net id bootIP bootTCP\n");
+			printf("Wrong format in command!\nCorrect formats:\njoin<space>net<space>id<ENTER>\njoin<space>net<space>id<space>bootIP<space>bootTCP<ENTER>\n");
 		}	
 	}
 	else if(strcmp("create",command) == 0)
@@ -105,7 +105,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format! Command: create subname\n");
+			printf("Wrong format in command!\nCorrect format:\ncreate<space>subname<ENTER>\n");
 		}
 	}
 	else if(strcmp("get",command) == 0)
@@ -120,12 +120,12 @@ char *readCommand(enum instr *instr_code)
 			}
 			else
 			{
-				printf("Invalid name! Format must be: id.subname\n");
+				printf("Invalid name! Name format must be: id.subname\n");
 			}
 		}
 		else
 		{
-			printf("Wrong format! Command: get name\n");
+			printf("Wrong format in command!\nCorrect format:\nget<space>name<ENTER>\n");
 		}
 	}
 	else if((strcmp("show",command) == 0 && strcmp("topology",second) == 0) || strcmp("st",command) == 0)
@@ -136,7 +136,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format in command! Command: show topology or st\n");
+			printf("Wrong format in command!\nCorrect format:\nshow<space>topology<ENTER>\nst<ENTER>\n");
 		}
 	}
 	else if((strcmp("show",command) == 0 && strcmp("routing",second) == 0) || strcmp("sr",command) == 0)
@@ -147,7 +147,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format in command! Command: show routing or sr\n");
+			printf("Wrong format in command!\nCorrect format:\nshow<space>routing<ENTER>\nsr<ENTER>\n");
 		}
 	}
 	else if((strcmp("show",command) == 0 && strcmp("cache",second) == 0) || strcmp("sc",command) == 0)
@@ -158,7 +158,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format in command! Command: show cache or sc\n");
+			printf("Wrong format in command!\nCorrect format:\nshow<space>cache<ENTER>\nsc<ENTER>\n");
 		}
 	}
 	else if(strcmp("leave",command) == 0)
@@ -169,7 +169,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format in command! Command: leave\n");
+			printf("Wrong format in command!\nCorrect format:\nleave<ENTER>\n");
 		}
 	}
 	else if(strcmp("exit",command) == 0)
@@ -180,7 +180,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format in command! Command: exit\n");
+			printf("Wrong format in command!\nCorrect format:\nexit<ENTER>\n");
 		}
 	}
 	else
