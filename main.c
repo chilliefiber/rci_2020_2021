@@ -53,6 +53,19 @@ typedef struct list_objects{
     struct list_objects *next;
 }list_objects;
 
+// lista de pedidos (interesse de vizinhos)
+typedef struct list_interest{
+    int fd;
+    char *obj;
+    struct list_interest *next;
+}list_interest;
+
+list_interest *addInterest(list_interest *first_interest, char *obj, int fd);
+
+void deleteInterest(list_interest **first_interest, char *obj, int fd);
+
+int checkInterest(list_interest *first_interest, char *obj);
+
 /**
 * getidfromName: função que extrai do nome introduzido pelo comando "get" o ientificador do nó destino para a pesquisa do objeto
 * \param user_input: ponteiro para a string correspondente ao nome introduzido pelo comando "get"
@@ -225,7 +238,7 @@ int main(int argc, char *argv[])
     node_list *nodes_fucking_list;
     fd_set rfds;
     int num_nodes, fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0;
-    int errcode, external_is_filled, we_used_tab_tmp;
+    int errcode, external_is_filled, we_used_tab_tmp, we_used_interest_tmp;
     enum instr instr_code;
     char *user_input, flag, tcp_read_flag;
     char command[150], arg1[150], arg2[150];
@@ -243,6 +256,7 @@ int main(int argc, char *argv[])
     internals *int_neighbours = NULL, *neigh_aux, *neigh_tmp, *neigh_tmp2;
 
     tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
+    list_interest *first_interest = NULL, *interest_aux;
     cache_objects cache[N];
     int n_obj = 0;
     // estados associados ao select
@@ -314,7 +328,6 @@ int main(int argc, char *argv[])
             printf("New connection mudafucka\n");
             new = safeMalloc(sizeof(viz));
             new->next_av_ix = 0;
-	    new->flag_interest = 0;
             addrlen = sizeof(addr);
             if ((new->fd = accept(tcp_server_fd, &addr, &addrlen)) == -1)
             {
@@ -495,9 +508,6 @@ int main(int argc, char *argv[])
                         id = NULL;
 		        id = getidfromName(arg1, id);
 
-                        // ativar flag_interest para o vizinho externo que nos mandou a mensagem de interesse
-                        external->flag_interest = 1;
-
                         // verificar primeiro se o identificador do objeto corresponde ao nosso (se somos o destino da mensagem de interesse)    
                         if(!strcmp(self.id, id))
                         {
@@ -530,7 +540,6 @@ int main(int argc, char *argv[])
 
                                 writeTCP(external->fd, strlen(message_buffer), message_buffer);
                             }
-                            external->flag_interest = 0;
                         }
                         else
                         {
@@ -548,20 +557,26 @@ int main(int argc, char *argv[])
                                 }
 
                                 writeTCP(external->fd, strlen(message_buffer), message_buffer);
-                                external->flag_interest = 0;
                             }
                             else
                             {
-                                // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
-                                tab_aux = first_entry;
-                                while(tab_aux != NULL)
+				// verifica se ja houve outro pedido do mesmo objeto feito por outro vizinho
+			        if(checkInterest(first_interest, arg1) == 0)
                                 {
-                                    if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
+				    first_interest = addInterest(first_interest, arg1, external->fd);
+                                    // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
+                                    tab_aux = first_entry;
+                                    while(tab_aux != NULL)
                                     {
-                                        writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
+                                        if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
+                                        {
+                                            writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
+                                        }
+                                        tab_aux = tab_aux->next;
                                     }
-                                    tab_aux = tab_aux->next;
-                                }
+				}
+				else
+                                    first_interest = addInterest(first_interest, arg1, external->fd);
                             }
                         }
 			free(id);
@@ -575,17 +590,28 @@ int main(int argc, char *argv[])
                     {
                         n_obj++;
                         n_obj = saveinCache(cache, arg1, n_obj);
-
-                        neigh_aux = int_neighbours;
-                        while (neigh_aux != NULL)
-                        {
-                            if(neigh_aux->this->flag_interest == 1)
+ 
+			interest_aux = first_interest;
+			interest_tmp = NULL;
+			we_used_interest_tmp = 0;
+			while(interest_aux != NULL)
+			{
+			    if(!strcmp(interest_aux->obj, arg1))
+			    {
+			        interest_tmp = interest_aux->next;
+				we_used_interest_tmp = 1;
+				writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+				deleteInterest(&first_interest, arg1, interest_aux->fd);
+			    }
+			    if (we_used_interest_tmp)
                             {
-                                writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
-                                neigh_aux->this->flag_interest = 0;
+                                interest_aux = interest_tmp;
+                                interest_tmp = NULL;
+                                we_used_interest_tmp = 0;
                             }
-                            neigh_aux = neigh_aux->next;
-                        }
+                            else
+                                interest_aux = interest_aux->next;
+			}
                     }
 
                     // para quando recebemos uma mensagem NODATA do vizinho externo, NÃO PRECISAMOS de armazenar nada na cache de objetos
@@ -594,16 +620,27 @@ int main(int argc, char *argv[])
                     // isto quer dizer que a mensagem NODATA chegou ao nó que tinha enviado a mensagem INTEREST inicial da pesquisa
                     if (!strcmp(command, "NODATA") && word_count == 2)
                     {	
-                        neigh_aux = int_neighbours;
-                        while (neigh_aux != NULL)
-                        {
-                            if(neigh_aux->this->flag_interest == 1)
+		        interest_aux = first_interest;
+			interest_tmp = NULL;
+			we_used_interest_tmp = 0;
+			while(interest_aux != NULL)
+			{
+			    if(!strcmp(interest_aux->obj, arg1))
+			    {
+			        interest_tmp = interest_aux->next;
+				we_used_interest_tmp = 1;
+				writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+				deleteInterest(&first_interest, arg1, interest_aux->fd);
+			    }
+			    if (we_used_interest_tmp)
                             {
-                                writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
-                                neigh_aux->this->flag_interest = 0;
+                                interest_aux = interest_tmp;
+                                interest_tmp = NULL;
+                                we_used_interest_tmp = 0;
                             }
-                            neigh_aux = neigh_aux->next;
-                        }
+                            else
+                                interest_aux = interest_aux->next;
+			}
                     }
 
                     msg_aux = msg_list;
@@ -719,7 +756,6 @@ int main(int argc, char *argv[])
                     }
                     writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     //waiting_for_backup = 1; // we're outnumbered, need backup
-		    external->flag_interest = 0;
                     //se tivermos internos que não sabem ainda que o nosso externo (o seu backup) mudou, notificá-los através da mensagem EXTERN
                     if(int_neighbours)
                     {
@@ -818,9 +854,6 @@ int main(int argc, char *argv[])
                             id = NULL;
 			    id = getidfromName(arg1, id);
 
-                            // ativar flag_interest para o vizinho interno que nos mandou a mensagem de interesse
-                            neigh_aux->this->flag_interest = 1;
-
                             // verificar primeiro se o identificador do objeto corresponde ao nosso (se somos o destino da mensagem de interesse)		
                             if(!strcmp(self.id, id))
                             {
@@ -853,7 +886,6 @@ int main(int argc, char *argv[])
 
                                     writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                                 }
-                                neigh_aux->this->flag_interest = 0;
                             }
                             else
                             {
@@ -871,74 +903,86 @@ int main(int argc, char *argv[])
                                     }
 
                                     writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
-                                    neigh_aux->this->flag_interest = 0;
                                 }
                                 else
                                 {
-                                    // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
-                                    tab_aux = first_entry;
-                                    while(tab_aux != NULL)
+			            // verifica se ja houve outro pedido do mesmo objeto feito por outro vizinho
+				    if(checkInterest(first_interest, arg1) == 0)
                                     {
-                                        if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
+					first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
+                                        // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
+                                        tab_aux = first_entry;
+                                        while(tab_aux != NULL)
                                         {
-                                            writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
+                                            if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
+                                            {
+                                                writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
+                                            }
+                                            tab_aux = tab_aux->next;
                                         }
-                                        tab_aux = tab_aux->next;
                                     }
-                                }
-                            }
+				    else
+			  	        first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
+				 }
+		            }
 			    free(id);
                         }
 
                         // para quando recebemos uma mensagem DATA do vizinho interno, primeiro armazenamos o objeto na cache de objetos
-                        // depois reencaminhamos a mensagem para o vizinho de onde veio a mensagem de interesse (através da flag_interest)
-                        // se as flag_interest do externo e interno estiverem ambas desativadas e se não se reencaminhar nenhuma mensagem 
-                        // isto quer dizer que a mensagem DATA chegou ao nó que tinha enviado a mensagem INTEREST inicial da pesquisa
+                        // depois reencaminhamos a mensagem para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
                         if (!strcmp(command, "DATA") && word_count == 2)
                         {
                             n_obj++;
                             n_obj = saveinCache(cache, arg1, n_obj);
 
-                            neigh_tmp = int_neighbours;
-                            while (neigh_tmp != NULL)
-                            {
-                                if(neigh_tmp->this->fd != neigh_aux->this->fd && neigh_tmp->this->flag_interest == 1)
+			    interest_aux = first_interest;
+			    interest_tmp = NULL;
+			    we_used_interest_tmp = 0;
+			    while(interest_aux != NULL)
+			    {
+				if(!strcmp(interest_aux->obj, arg1))
+				{
+				    interest_tmp = interest_aux->next;
+				    we_used_interest_tmp = 1;
+				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+				    deleteInterest(&first_interest, arg1, interest_aux->fd);
+				}
+				if (we_used_interest_tmp)
                                 {
-                                    writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
-                                    neigh_tmp->this->flag_interest = 0;
+                                    interest_aux = interest_tmp;
+                                    interest_tmp = NULL;
+                                    we_used_interest_tmp = 0;
                                 }
-                                neigh_tmp = neigh_tmp->next;
-                            }
-
-                            if(external->flag_interest == 1)
-                            {
-                                writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
-				external->flag_interest = 0;
-                            }
+                                else
+                                    interest_aux = interest_aux->next;
+			    }
                         }
 
                         // para quando recebemos uma mensagem NODATA do vizinho interno, NÃO PRECISAMOS de armazenar nada na cache de objetos
-                        // simplesmente reencaminhamos a mensagem de volta para o vizinho de onde veio a mensagem de interesse (através da flag_interest)
-                        // se as flag_interest do externo e interno estiverem ambas desativadas e se não se reencaminhar nenhuma mensagem 
-                        // isto quer dizer que a mensagem DATA chegou ao nó que tinha enviado a mensagem INTEREST inicial da pesquisa
+                        // simplesmente reencaminhamos a mensagem de volta para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
                         if (!strcmp(command, "NODATA") && word_count == 2)
                         {
-                            neigh_tmp = int_neighbours;
-                            while (neigh_tmp != NULL)
-                            {
-                                if(neigh_tmp->this->fd != neigh_aux->this->fd && neigh_tmp->this->flag_interest == 1)
+			    interest_aux = first_interest;
+			    interest_tmp = NULL;
+			    we_used_interest_tmp = 0;
+			    while(interest_aux != NULL)
+			    {
+				if(!strcmp(interest_aux->obj, arg1))
+				{
+				    interest_tmp = interest_aux->next;
+				    we_used_interest_tmp = 1;
+				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+				    deleteInterest(&first_interest, arg1, interest_aux->fd);
+				}
+				if (we_used_interest_tmp)
                                 {
-                                    writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
-                                    neigh_tmp->this->flag_interest = 0;
+                                    interest_aux = interest_tmp;
+                                    interest_tmp = NULL;
+                                    we_used_interest_tmp = 0;
                                 }
-                                neigh_tmp = neigh_tmp->next;
-                            }
-
-                            if(external->flag_interest == 1)
-                            {
-                                writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
-				external->flag_interest = 0;
-                            }
+                                else
+                                    interest_aux = interest_aux->next;
+			    }
                         }
 
                         msg_aux = msg_list;
@@ -1103,7 +1147,6 @@ int main(int argc, char *argv[])
                         //waiting_for_backup = 1; // we're outnumbered, need backup
                         network_state = MANYNODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                         // quer dizer, podemos ver pelo num_nodes na verdade
-	     	        external->flag_interest = 0;
                         // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
                         errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -1221,7 +1264,6 @@ int main(int argc, char *argv[])
                 //waiting_for_backup = 1; // we're outnumbered, need backup
                 network_state = MANYNODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
                 // quer dizer, podemos ver pelo num_nodes na verdade
-		external->flag_interest = 0;
                 // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
                 errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -1371,10 +1413,16 @@ int main(int argc, char *argv[])
             else if(instr_code == ST)
             {
                 if (network_state == NONODES)
+		{
+		    printf("State is NONODES\n");
                     printf("We're not connected to any network\n");
-                else if (network_state == ONENODE)
-                    printf("We're alone in network %s!\n", self.net);           
-                else if (network_state == MANYNODES)
+		}
+		else if (network_state == ONENODE)
+		{
+		    printf("State is ONENODE\n");
+                    printf("We're alone in network %s!\n", self.net);         
+		}
+		else if (network_state == MANYNODES)
                 {
                     printf("State is MANYNODES\n");
                     neigh_aux = int_neighbours;
@@ -1408,6 +1456,79 @@ int main(int argc, char *argv[])
             free(user_input);
         }
     }	
+    return 0;
+}
+
+list_interest *addInterest(list_interest *first_interest, char *obj, int fd)
+{
+    list_interest *tmp = first_interest;
+    list_interest *new_interest = safeMalloc(sizeof(list_interest));
+    
+    new_interest->obj = safeMalloc(strlen(obj)+1);
+    strcpy(new_interest->obj, obj);
+    new_interest->fd = fd;
+
+    if(first_interest == NULL)
+    {
+        first_interest = new_interest;
+        new_interest->next = NULL;
+    }
+    else
+    {
+        while(tmp->next != NULL)
+        {
+            tmp = tmp->next;
+        }
+        tmp->next = new_interest;
+        new_interest->next = NULL;
+    }
+
+    return first_interest;
+}
+
+void deleteInterest(list_interest **first_interest, char *obj, int fd)
+{
+    list_interest *tmp;
+
+    if(!strcmp((*first_interest)->obj, obj) && (*first_interest)->fd == fd)
+    {
+        tmp = *first_interest; 
+        *first_interest = (*first_interest)->next;
+        free(tmp->obj);
+        free(tmp);
+    }
+    else
+    {
+        list_interest *curr = *first_interest;
+
+        while(curr->next != NULL)
+        {
+            if(!strcmp(curr->next->obj, obj) && curr->next->fd == fd)
+            {
+                tmp = curr->next;
+                curr->next = curr->next->next;
+                free(tmp->obj);
+                free(tmp);
+                break;
+            }
+            else
+                curr = curr->next;
+        }
+    }
+}
+
+int checkInterest(list_interest *first_interest, char *obj)
+{
+    list_interest *aux = first_interest;
+
+    while(aux != NULL)
+    {
+        if(!strcmp(aux->obj, obj))
+        {
+            return 1;
+        }
+        aux = aux->next;
+    }
     return 0;
 }
 
@@ -1760,6 +1881,5 @@ void addToList(internals **int_neighbours, viz *new)
     internals *aux = *int_neighbours;
     *int_neighbours = safeMalloc(sizeof(internals));
     (*int_neighbours)->this = new;
-    (*int_neighbours)->this->flag_interest = 0;
     (*int_neighbours)->next = aux;
 }
