@@ -256,7 +256,7 @@ int main(int argc, char *argv[])
     internals *int_neighbours = NULL, *neigh_aux, *neigh_tmp, *neigh_tmp2;
 
     tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
-    list_interest *first_interest = NULL, *interest_aux;
+    list_interest *first_interest = NULL, *interest_aux, *interest_tmp;
     cache_objects cache[N];
     int n_obj = 0;
     // estados associados ao select
