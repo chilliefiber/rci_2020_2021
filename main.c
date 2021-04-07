@@ -1282,7 +1282,7 @@ int main(int argc, char *argv[])
                 if (!external)
                     external = safeMalloc(sizeof(viz));
                 external_is_filled = 1;
-                if(sscanf(user_input,"%s %s %s %s", self.net, self.id, external->IP, external->port ) != 4)
+                if(sscanf(user_input,"%s %s %s %s", net, ident, external->IP, external->port ) != 4)
                 {
                     printf("Error in sscanf JOIN_LINK\n");
                     exit(1);
