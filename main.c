@@ -563,23 +563,21 @@ int main(int argc, char *argv[])
                             else
                             {
 				// verifica se ja houve outro pedido do mesmo objeto feito
-			        if(checkInterest(first_interest, arg1, external->fd) == 0)
+			        if(checkInterest(first_interest, arg1, external->fd) != 1)
                                 {
 				    first_interest = addInterest(first_interest, arg1, external->fd);
-                                    // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
-                                    tab_aux = first_entry;
-                                    while(tab_aux != NULL)
-                                    {
-                                        if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
-                                        {
-                                            writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
-                                        }
-                                        tab_aux = tab_aux->next;
-                                    }
 				}
-				else if (checkInterest(first_interest, arg1, external->fd) == 2)
-                                    first_interest = addInterest(first_interest, arg1, external->fd);
-                            }
+				// se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
+                                tab_aux = first_entry;
+                                while(tab_aux != NULL)
+                                {
+                                    if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
+                                    {
+                                        writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
+                                    }
+                                    tab_aux = tab_aux->next;
+                                }
+			    }
                         }
 			free(id);
                     }
@@ -588,29 +586,32 @@ int main(int argc, char *argv[])
                     // depois reencaminhamos a mensagem para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
                     if (!strcmp(command, "DATA") && word_count == 2)
                     {
-                        n_obj++;
-                        n_obj = saveinCache(cache, arg1, n_obj);
+			if(checkCache(cache, arg1, n_obj) == 0)
+                        {
+                            n_obj++;
+                            n_obj = saveinCache(cache, arg1, n_obj);
  
-			interest_aux = first_interest;
-			interest_tmp = NULL;
-			we_used_interest_tmp = 0;
-			while(interest_aux != NULL)
-			{
-			    if(!strcmp(interest_aux->obj, arg1))
+			    interest_aux = first_interest;
+			    interest_tmp = NULL;
+			    we_used_interest_tmp = 0;
+			    while(interest_aux != NULL)
 			    {
-			        interest_tmp = interest_aux->next;
-				we_used_interest_tmp = 1;
-				writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
-				deleteInterest(&first_interest, arg1, interest_aux->fd);
+			        if(!strcmp(interest_aux->obj, arg1))
+			        {
+			            interest_tmp = interest_aux->next;
+				    we_used_interest_tmp = 1;
+				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+				    deleteInterest(&first_interest, arg1, interest_aux->fd);
+			        }
+			        if (we_used_interest_tmp)
+                                {
+                                    interest_aux = interest_tmp;
+                                    interest_tmp = NULL;
+                                    we_used_interest_tmp = 0;
+                                }
+                                else
+                                    interest_aux = interest_aux->next;
 			    }
-			    if (we_used_interest_tmp)
-                            {
-                                interest_aux = interest_tmp;
-                                interest_tmp = NULL;
-                                we_used_interest_tmp = 0;
-                            }
-                            else
-                                interest_aux = interest_aux->next;
 			}
                     }
 
@@ -925,24 +926,22 @@ int main(int argc, char *argv[])
                                 }
                                 else
                                 {
-			            // verifica se ja houve outro pedido do mesmo objeto
-				    if(checkInterest(first_interest, arg1, neigh_aux->this->fd) == 0)
+			             // verifica se ja houve outro pedido do mesmo objeto feito 
+			            if(checkInterest(first_interest, arg1, neigh_aux->this->fd) != 1)
                                     {
-					first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
-                                        // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
-                                        tab_aux = first_entry;
-                                        while(tab_aux != NULL)
+				        first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
+				    }
+				    // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
+                                    tab_aux = first_entry;
+                                    while(tab_aux != NULL)
+                                    {
+                                        if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                                         {
-                                            if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
-                                            {
-                                                writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
-                                            }
-                                            tab_aux = tab_aux->next;
+                                            writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
                                         }
-                                    }
-				    else if(checkInterest(first_interest, arg1, neigh_aux->this->fd) == 2)
-			  	        first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
-				 }
+                                        tab_aux = tab_aux->next;
+                                    }    
+				}
 		            }
 			    free(id);
                         }
@@ -951,29 +950,32 @@ int main(int argc, char *argv[])
                         // depois reencaminhamos a mensagem para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
                         if (!strcmp(command, "DATA") && word_count == 2)
                         {
-                            n_obj++;
-                            n_obj = saveinCache(cache, arg1, n_obj);
+			    if(checkCache(cache, arg1, n_obj) == 0)
+                            {
+                                n_obj++;
+                                n_obj = saveinCache(cache, arg1, n_obj);
 
-			    interest_aux = first_interest;
-			    interest_tmp = NULL;
-			    we_used_interest_tmp = 0;
-			    while(interest_aux != NULL)
-			    {
-				if(!strcmp(interest_aux->obj, arg1))
-				{
-				    interest_tmp = interest_aux->next;
-				    we_used_interest_tmp = 1;
-				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
-				    deleteInterest(&first_interest, arg1, interest_aux->fd);
-				}
-				if (we_used_interest_tmp)
-                                {
-                                    interest_aux = interest_tmp;
-                                    interest_tmp = NULL;
-                                    we_used_interest_tmp = 0;
-                                }
-                                else
-                                    interest_aux = interest_aux->next;
+			        interest_aux = first_interest;
+			        interest_tmp = NULL;
+			        we_used_interest_tmp = 0;
+			        while(interest_aux != NULL)
+			        {
+				    if(!strcmp(interest_aux->obj, arg1))
+				    {
+				        interest_tmp = interest_aux->next;
+				        we_used_interest_tmp = 1;
+				        writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+				        deleteInterest(&first_interest, arg1, interest_aux->fd);
+				    }
+				    if (we_used_interest_tmp)
+                                    {
+                                        interest_aux = interest_tmp;
+                                        interest_tmp = NULL;
+                                        we_used_interest_tmp = 0;
+                                    }
+                                    else
+                                        interest_aux = interest_aux->next;
+			        }
 			    }
                         }
 
