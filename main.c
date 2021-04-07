@@ -575,7 +575,7 @@ int main(int argc, char *argv[])
                                         tab_aux = tab_aux->next;
                                     }
 				}
-				else(checkInterest(first_interest, arg1, external->fd) == 2)
+				else if (checkInterest(first_interest, arg1, external->fd) == 2)
                                     first_interest = addInterest(first_interest, arg1, external->fd);
                             }
                         }
