@@ -64,6 +64,8 @@ list_interest *addInterest(list_interest *first_interest, char *obj, int fd);
 
 void deleteInterest(list_interest **first_interest, char *obj, int fd);
 
+void deleteInterestfd(list_interest **first_interest, int fd);
+
 int checkInterest(list_interest *first_interest, char *obj, int fd);
 
 /**
@@ -680,6 +682,27 @@ int main(int argc, char *argv[])
                     else
                         tab_aux = tab_aux->next;
                 }
+		    
+		interest_aux = first_interest;
+		interest_tmp = NULL;
+		we_used_interest_tmp = 0;
+		while(interest_aux != NULL)
+		{
+	 	    if(interest_aux->fd == external->fd)
+		    {
+		        interest_tmp = interest_aux->next;
+			we_used_interest_tmp = 1;
+			deleteInterestfd(&first_interest, interest_aux->fd);
+	            }
+		    if (we_used_interest_tmp)
+                    {
+                        interest_aux = interest_tmp;
+                        interest_tmp = NULL;
+                        we_used_interest_tmp = 0;
+                    }
+                    else
+                        interest_aux = interest_aux->next;
+		}
 
                 if ((errcode = close(external->fd)))
                 {
@@ -1033,6 +1056,27 @@ int main(int argc, char *argv[])
                         else
                             tab_aux = tab_aux->next;
                     }
+			
+		    interest_aux = first_interest;
+		    interest_tmp = NULL;
+		    we_used_interest_tmp = 0;
+		    while(interest_aux != NULL)
+		    {
+	 	        if(interest_aux->fd == neigh_aux->this->fd)
+			{
+			    interest_tmp = interest_aux->next;
+			    we_used_interest_tmp = 1;
+			    deleteInterestfd(&first_interest, interest_aux->fd);
+			}
+			if (we_used_interest_tmp)
+                        {
+                            interest_aux = interest_tmp;
+                            interest_tmp = NULL;
+                            we_used_interest_tmp = 0;
+                        }
+                        else
+                            interest_aux = interest_aux->next;
+		    }
 
                     close(neigh_aux->this->fd); // fechar o fd do tipo que fez close do outro lado
                     printf("O nosso vizinho interno abandonou\n");
@@ -1500,6 +1544,37 @@ void deleteInterest(list_interest **first_interest, char *obj, int fd)
         while(curr->next != NULL)
         {
             if(!strcmp(curr->next->obj, obj) && curr->next->fd == fd)
+            {
+                tmp = curr->next;
+                curr->next = curr->next->next;
+                free(tmp->obj);
+                free(tmp);
+                break;
+            }
+            else
+                curr = curr->next;
+        }
+    }
+}
+
+void deleteInterestfd(list_interest **first_interest, int fd)
+{
+    list_interest *tmp;
+
+    if((*first_interest)->fd == fd)
+    {
+        tmp = *first_interest; 
+        *first_interest = (*first_interest)->next;
+        free(tmp->obj);
+        free(tmp);
+    }
+    else
+    {
+        list_interest *curr = *first_interest;
+
+        while(curr->next != NULL)
+        {
+            if(curr->next->fd == fd)
             {
                 tmp = curr->next;
                 curr->next = curr->next->next;
