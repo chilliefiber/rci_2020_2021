@@ -560,8 +560,8 @@ int main(int argc, char *argv[])
                             }
                             else
                             {
-				// verifica se ja houve outro pedido do mesmo objeto feito por outro vizinho
-			        if(checkInterest(first_interest, arg1) == 0)
+				// verifica se ja houve outro pedido do mesmo objeto feito
+			        if(checkInterest(first_interest, arg1, external->fd) == 0)
                                 {
 				    first_interest = addInterest(first_interest, arg1, external->fd);
                                     // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
@@ -575,7 +575,7 @@ int main(int argc, char *argv[])
                                         tab_aux = tab_aux->next;
                                     }
 				}
-				else
+				else(checkInterest(first_interest, arg1, external->fd) == 2)
                                     first_interest = addInterest(first_interest, arg1, external->fd);
                             }
                         }
@@ -583,9 +583,7 @@ int main(int argc, char *argv[])
                     }
 
                     // para quando recebemos uma mensagem DATA do vizinho externo, primeiro armazenamos o objeto na cache de objetos
-                    // depois reencaminhamos a mensagem de volta para o vizinho de onde veio a mensagem de interesse (através da flag_interest)
-                    // se a flag_interest do interno estiver desativada e se não se reencaminhar nenhuma mensagem 
-                    // isto quer dizer que a mensagem DATA chegou ao nó que tinha enviado a primeira mensagem INTEREST inicial da pesquisa
+                    // depois reencaminhamos a mensagem para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
                     if (!strcmp(command, "DATA") && word_count == 2)
                     {
                         n_obj++;
@@ -615,9 +613,7 @@ int main(int argc, char *argv[])
                     }
 
                     // para quando recebemos uma mensagem NODATA do vizinho externo, NÃO PRECISAMOS de armazenar nada na cache de objetos
-                    // simplesmente reencaminhamos a mensagem de volta para o vizinho de onde veio a mensagem de interesse (através da flag_interest)
-                    // se a flag_interest do interno estiver desativada e se não se reencaminhar nenhuma mensagem 
-                    // isto quer dizer que a mensagem NODATA chegou ao nó que tinha enviado a mensagem INTEREST inicial da pesquisa
+                    // simplesmente reencaminhamos a mensagem de volta para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
                     if (!strcmp(command, "NODATA") && word_count == 2)
                     {	
 		        interest_aux = first_interest;
@@ -906,8 +902,8 @@ int main(int argc, char *argv[])
                                 }
                                 else
                                 {
-			            // verifica se ja houve outro pedido do mesmo objeto feito por outro vizinho
-				    if(checkInterest(first_interest, arg1) == 0)
+			            // verifica se ja houve outro pedido do mesmo objeto
+				    if(checkInterest(first_interest, arg1, neigh_aux->this->fd) == 0)
                                     {
 					first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
                                         // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
@@ -921,7 +917,7 @@ int main(int argc, char *argv[])
                                             tab_aux = tab_aux->next;
                                         }
                                     }
-				    else
+				    else if(checkInterest(first_interest, arg1, neigh_aux->this->fd) == 2)
 			  	        first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
 				 }
 		            }
@@ -1517,18 +1513,25 @@ void deleteInterest(list_interest **first_interest, char *obj, int fd)
     }
 }
 
-int checkInterest(list_interest *first_interest, char *obj)
+int checkInterest(list_interest *first_interest, char *obj, int fd)
 {
     list_interest *aux = first_interest;
 
     while(aux != NULL)
     {
-        if(!strcmp(aux->obj, obj))
+	// se ja houver um pedido igual do mesmo vizinho
+        if(!strcmp(aux->obj, obj) && aux->fd == fd)
         {
             return 1;
         }
+	// se ja houver um pedido igual mas proveniente de outro vizinho
+	if(!strcmp(aux->obj, obj) && aux->fd != fd)
+        {
+            return 2;
+        }
         aux = aux->next;
     }
+    // se não houver pedido igual
     return 0;
 }
 
