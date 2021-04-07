@@ -15,7 +15,6 @@ typedef struct messages{
 } messages; 
 
 typedef struct viz{
-    int flag_interest;
     int fd; //file descriptor associado à conexão com o vizinho 
     char IP[NI_MAXHOST]; //endereço IP do vizinho
     char port[NI_MAXSERV]; //Porto TCP do vizinho
