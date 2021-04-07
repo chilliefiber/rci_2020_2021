@@ -1,0 +1,51 @@
+DUVIDAS A CODAR
+1 - mostrar aquilo que está no recursive cenas acerca do sscanf. Basicamente, podemos ignorar esses inputs mal formatados?
+2 - o que fazer caso, quando estamos a fazer join, o no que escolhemos para nos ligarmos de entre a lista recebida nao aceita o connect? De momento o nosso programa dá exit, é suposto tentarmos com outros?
+3 - No listen, quão grande deve ser o backlog?
+4 - Atenção à questão de passar um vizinho interno para externo: a memoria do vizinho interno de momento esta a ser dinamicamente alocada, o vizinho externo está na stack
+5 - Em relação a não colocar o servidor TCP e o udp_fd no select quando não é necessário provavelmente aquilo dá barraca. Melhor será receber e ignorar nesses casos
+7 - Confirmar aquela mudança no processReadTCP new->message[ix - start_ix + 1] = '\0' vs ix-start_ix+2
+8 - Confirmar mudança no processReadTCP do    strncpy(sender->buffer, sender->buffer + start_ix, ix - start_ix); vs     strncpy(sender->buffer, sender->buffer + start_ix, ix - start_ix+1)
+9 - NI_MAXHOST vs INET_ADDRSTRLEN
+10 - Mostrar bug do wireshark que está a captar os pacotes por udp com o servidor de nós antes dos pacotes por TCP na interface loopback, apesar de com printfs eu conseguir perceber que envio primeiro os pacotes por TCP. Há um packet dump na folder rci
+11 - Quando do outro lado da conexão TCP fizeram close, o que acontece ao valor do fd do nosso lado?
+12 - Quando do outro lado da conexão TCP fizeram close, devemos fazer close tambem correto? É o que está no quick guide
+14 - Race condition quando estamos a promover um vizinho interno a externo, e ainda não recebemos a mensagem NEW desse vizinho interno. Ao enviar o extern no MSG_CLOSED do external->fd vamos enviar dados em branco para o IP e o port. Resolve-se criando os vizinhos internos com memset(0) dos campos IP e porto e verificando que se a memória está a 0 nesse ponto não enviamos o EXTERN. Depois o resto do código fará com que ao receber o NEW ele envie o EXTERN corretamente no isset(external->fd), já com o external atualizado para ser o interno promovido que ainda não tinha enviado o NEW
+15 - Temos de verificar que quando nos estamos a juntar não há nenhum com o mesmo ID. é que o servidor de nós não guarda IDs, portanto não dá para ver
+16 - Fizemos um teste em que colocámos um dummy node no servidor com o netcat e depois o nosso programa fica preso no connectTCP,a enviar para esse nó SYNs. Temos de lidar com este caso? Foi no IP 1.1.1.1 porto 5800, eles não respondiam ao nosso SYN
+17 - safeExit? Ou seja, fechar todos os fds sempre que fazemos exit por causa de um erro
+18 - argc == 3????
+19 - quando recebemos um objeto devemos notificar o utilizador
+20 - Se um gajo sair, os objetos dele que estão na cache de outros tipos têm de ser apagados?
+
+21 - ImPoRtAnTe temos de usar o switch no select com a for loop?
+
+22 - O que fazer quando recebemos um objeto que nao pedimos? Podemos ignorar?
+
+RESPOSTAS
+17 - sim, limpar toda a memória e fechar todos os fd quando fazemos exit. Mas o programa deve tentar nao fechar nunca, mas sim prosseguir (em particular erros no read e no write sao para dar seguimento). 
+
+2 - Nao fazer exit
+16 - Nao nos preocuparmos
+20 - Retirar sim
+15 - Não temos de lidar com isso, mas podemos lidar quando recebemos  um advertise do nosso id bazar 
+18 - sim obrigatório
+** Mandar NODATA quando nao temos o destino na tabela de encaminhamento
+21 - Nao
+
+Quando um gajo sai, temos de limpar na nossa lista os objetos da cache
+Notar que na lista de interesse, não vamos conseguir limpar os pedidos dos nós que sairam
+
+
+3 - Podemos ter um numero indefinido de objetos associados ao nosso nome, mas apenas 2 objetos de outros nos? R:Sim
+
+DUVIDAS NA PESQUISA DE OBJETO
+
+1 - Ao pesquisar um objeto do ponto de vista do nó que inicia a busca, o que acontece caso o utilizador inicie 2 buscas de seguida para o mesmo objeto sem receber resposta da primeira? Caso seja uma rede de latencia baixa isto é irrelevante porque em principio chega a resposta antes do utilizador escrever o pedido seguinte. Temos de nos preocupar com isto?
+
+
+2 - O que acontece quando um nó intermédio recebe 2 pedidos de seguida para o mesmo objeto, vindos de 2 vizinhos diferentes. Eu diria que podemos nao difundir 2 mensagens de interesse, simplesmente adicionamos à estrutura de nos que procuraram esse objeto o 2º no que pediu e depois enviamos para ambos ao receber DATA/NODATA. Temos de nos preocupar com isto, latencia baixa etc
+
+
+
+
