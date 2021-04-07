@@ -64,7 +64,7 @@ list_interest *addInterest(list_interest *first_interest, char *obj, int fd);
 
 void deleteInterest(list_interest **first_interest, char *obj, int fd);
 
-int checkInterest(list_interest *first_interest, char *obj);
+int checkInterest(list_interest *first_interest, char *obj, int fd);
 
 /**
 * getidfromName: função que extrai do nome introduzido pelo comando "get" o ientificador do nó destino para a pesquisa do objeto
