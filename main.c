@@ -34,6 +34,11 @@ typedef struct cache_objects{
     char *obj;
 }cache_objects;
 
+// estrutura auxiliar para cache (caso WITHDRAW retirar elementos com o id)
+typedef struct cache_aux{
+    char *obj;
+}cache_aux;
+
 typedef struct no{
     char *net; //identificador da rede
     char *id;    //identificador do nó
@@ -180,6 +185,12 @@ void printCache(cache_objects cache[N], int n_obj);
 * \param n_obj: inteiro correspondente ao número de objetos presentes na cache
 */
 void FreeCache(cache_objects cache[N], int n_obj);
+
+int deleteCacheid(cache_objects cache[N], int n_obj, char *id);
+
+cache_aux *createinsertCacheAux(cache_aux *head_c, char *objct);
+
+void FreeCacheAuxList(cache_aux **head_c);
 
 void addToList(internals **int_neighbours, viz *new);
 
@@ -502,6 +513,7 @@ int main(int argc, char *argv[])
                             neigh_aux = neigh_aux->next;
                         }
                         deleteTabEntryid(&first_entry, arg1);
+			n_obj = deleteCacheid(cache, n_obj, arg1);
                     }
 
                     //para quando recebemos uma mensagem INTEREST do vizinho externo
@@ -843,9 +855,7 @@ int main(int argc, char *argv[])
                                 }
                                 neigh_tmp = neigh_tmp->next;
                             }
-
                             writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
-
                             first_entry = createinsertTabEntry(first_entry, arg1, neigh_aux->this->fd);
                         }
 
@@ -862,10 +872,9 @@ int main(int argc, char *argv[])
                                 }
                                 neigh_tmp = neigh_tmp->next;
                             }
-
                             writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
-
                             deleteTabEntryid(&first_entry, arg1);
+			    n_obj = deleteCacheid(cache, n_obj, arg1);
                         }
 
                         // para quando recebemos uma mensagem INTEREST dum vizinho interno
@@ -1601,11 +1610,6 @@ int checkInterest(list_interest *first_interest, char *obj, int fd)
         {
             return 1;
         }
-	// se ja houver um pedido igual mas proveniente de outro vizinho
-	if(!strcmp(aux->obj, obj) && aux->fd != fd)
-        {
-            return 2;
-        }
         aux = aux->next;
     }
     // se não houver pedido igual
@@ -1954,6 +1958,89 @@ void FreeCache(cache_objects cache[N], int n_obj)
         free(cache[i].obj);
 	cache[i].obj = NULL;
     }
+}
+
+int deleteCacheid(cache_objects cache[N], int n_obj, char *id)
+{
+    int i;
+    char *ident;
+    int num = n_obj;
+    cache_aux *head_c = NULL, *aux;
+	
+    for(i=0; i<n_obj; i++)
+    {
+        ident = NULL;
+        ident = getidfromName(cache[i].obj, ident);
+        
+        if(!strcmp(ident, id))
+        {   
+            free(cache[i].obj);
+            cache[i].obj = NULL;
+            num--;
+        }
+        else
+        {
+            head_c = createinsertCacheAux(head_c, cache[i].obj);
+            free(cache[i].obj);
+            cache[i].obj = NULL; 
+        }
+        free(ident);
+    }
+
+    i = 0;
+    aux = head_c;
+    while(aux != NULL)
+    {
+        cache[i].obj = safeMalloc(strlen(aux->obj)+1);
+        strcpy(cache[i].obj, aux->obj);
+        aux = aux->next;
+        i++;
+    }
+    FreeCacheAux(&head_c);
+
+    return num;
+}
+
+cache_aux *createinsertCacheAux(cache_aux *head_c, char *objct)
+{
+    cache_aux *tmp = head_c;
+    cache_aux *new = safeMalloc(sizeof(cache_aux));
+
+    new->obj = safeMalloc(strlen(objct)+1);
+    strcpy(new->obj, objct);
+
+    if(head_c == NULL)
+    {
+        head_c = new;
+        new->next = NULL;
+    }
+    else
+    {
+        while(tmp->next != NULL)
+        {
+            tmp = tmp->next;
+        }
+        tmp->next = new;
+        new->next = NULL;
+    }
+
+    return head_c;
+}
+
+void FreeCacheAuxList(cache_aux **head_c)
+{
+    cache_aux *curr = *head_c;
+    cache_aux *next;
+
+    while(curr != NULL)
+    {
+        next = curr->next;
+        free(curr->obj);
+        free(curr);
+        curr = next;
+    }
+
+    *head_c = NULL;
 }
 
 void addToList(internals **int_neighbours, viz *new)
