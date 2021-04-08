@@ -37,6 +37,7 @@ typedef struct cache_objects{
 // estrutura auxiliar para cache (caso WITHDRAW retirar elementos com o id)
 typedef struct cache_aux{
     char *obj;
+    struct cache_aux *next;
 }cache_aux;
 
 typedef struct no{
@@ -1996,7 +1997,7 @@ int deleteCacheid(cache_objects cache[N], int n_obj, char *id)
         aux = aux->next;
         i++;
     }
-    FreeCacheAux(&head_c);
+    FreeCacheAuxList(&head_c);
 
     return num;
 }
