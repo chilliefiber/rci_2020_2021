@@ -197,25 +197,28 @@ void addToList(internals **int_neighbours, viz *new);
 
 int main(int argc, char *argv[])
 {
-    if(argc < 5 || argc > 6)
+    if(argc != 3 && argc != 5 && argc != 6)
     {
         printf("Invalid number of arguments!\n");
-        printf("Usage: ./ndn IP TCP regIP regUDP\nOptional Usage: ./ndn IP TCP regIP regUDP cache_size\n");
+        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
         exit(1);
     }
     
-    if(isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
+    if(argc == 5 || argc == 6)
     {
-        if(isIP(argv[1]) == 0)
-        printf("Invalid IP address! Error in <argv[1]>\n");
-        if(isPort(argv[2]) == 0)
-        printf("Invalid TCP port! Error in <argv[2]>\n");
-        if(isIP(argv[3]) == 0)
-        printf("Invalid regIP address! Error in <argv[3]>\n");
-        if(isPort(argv[4]) == 0)
-        printf("Invalid regUDP port! Error in <argv[4]>\n");
-	printf("Usage: ./ndn IP TCP regIP regUDP\nOptional Usage: ./ndn IP TCP regIP regUDP cache_size\n");	
-        exit(1);
+        if(isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
+        {
+            if(isIP(argv[1]) == 0)
+            printf("Invalid IP address! Error in <argv[1]>\n");
+            if(isPort(argv[2]) == 0)
+            printf("Invalid TCP port! Error in <argv[2]>\n");
+            if(isIP(argv[3]) == 0)
+            printf("Invalid regIP address! Error in <argv[3]>\n");
+            if(isPort(argv[4]) == 0)
+            printf("Invalid regUDP port! Error in <argv[4]>\n");
+	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
+            exit(1);
+        }
     }
     
     if(argc == 6)
@@ -226,7 +229,7 @@ int main(int argc, char *argv[])
    	    if(N == 0)
 	    {
 	        printf("Invalid size for cache! Must be able to save at least 1 object!\n");
-		printf("Usage: ./ndn IP TCP regIP regUDP\nOptional Usage: ./ndn IP TCP regIP regUDP cache_size\n");
+		printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
 		exit(1);
             }
             printf("Cache size: %d\n",N); 
@@ -234,8 +237,8 @@ int main(int argc, char *argv[])
         else
         {
 	    printf("Invalid size for cache!\n");
-	    printf("Usage: ./ndn IP TCP regIP regUDP\nOptional Usage: ./ndn IP TCP regIP regUDP cache_size\n");
-	    exit(1);    
+	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
+	    exit(1);   
         }
     }
 	
@@ -243,6 +246,21 @@ int main(int argc, char *argv[])
     {
         N = 2;
         printf("Default cache size: %d\n",N);
+    }
+    
+    if(argc == 3)
+    {
+        if(isIP(argv[1]) == 0 || isPort(argv[2]) == 0)
+        {
+	    if(isIP(argv[1]) == 0)
+            printf("Invalid IP address! Error in <argv[1]>\n");
+            if(isPort(argv[2]) == 0)
+            printf("Invalid TCP port! Error in <argv[2]>\n");
+	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
+	    exit(1);
+	}
+	argv[3] = "193.136.138.142";
+	argv[4] = "59000";
     }
     // enum dos vários estados associados à rede de nós
     // NONODES no caso em que não existem nós
