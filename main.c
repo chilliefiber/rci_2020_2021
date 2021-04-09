@@ -245,7 +245,6 @@ int main(int argc, char *argv[])
     if(argc == 5) 
     {
         N = 2;
-        printf("Default cache size: %d\n",N);
     }
     
     if(argc == 3)
@@ -406,9 +405,7 @@ int main(int argc, char *argv[])
                     errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                     {
-                        // isto tá mal, o strncpy não afeta o errno!!
-                        // deixo por agora para me lembrar de mudar em todos
-                        fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                        fprintf(stderr, "error in EXTERN TCP message creation when there are only two nodes\n");
                         exit(-1);
                     }
                     writeTCP(new->fd, strlen(message_buffer), message_buffer);
@@ -458,7 +455,7 @@ int main(int argc, char *argv[])
                             errcode = snprintf(message_buffer, 150, "REG %s %s %s", self.net, self.IP, self.port);  
                             if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                             {
-                                fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
+                                fprintf(stderr, "error in REG UDP message creation\n");
                                 exit(-1);
                             }
                             sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
@@ -483,9 +480,7 @@ int main(int argc, char *argv[])
                         errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
-                            // isto tá mal, o strncpy não afeta o errno!!
-                            // deixo por agora para me lembrar de mudar em todos
-                            fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                            fprintf(stderr, "error in EXTERN TCP message creation when there are only two nodes\n");
                             exit(-1);
                         }
                         writeTCP(external->fd, strlen(message_buffer), message_buffer);
@@ -518,7 +513,6 @@ int main(int argc, char *argv[])
                             writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message);
                             neigh_aux = neigh_aux->next;
                         }
-
                         first_entry = createinsertTabEntry(first_entry, arg1, external->fd);
                     }
 
@@ -552,13 +546,9 @@ int main(int argc, char *argv[])
                                 errcode = snprintf(message_buffer, 150, "DATA %s\n", arg1);  
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                 {
-                                    // isto tá mal, o strncpy não afeta o errno!!
-                                    // deixo por agora para me lembrar de mudar em todos
-                                    fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                    fprintf(stderr, "error in DATA TCP message creation\n");
                                     exit(-1);
                                 }
-
-                                writeTCP(external->fd, strlen(message_buffer), message_buffer);
                             }
                             else
                             {
@@ -566,14 +556,11 @@ int main(int argc, char *argv[])
                                 errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                 {
-                                    // isto tá mal, o strncpy não afeta o errno!!
-                                    // deixo por agora para me lembrar de mudar em todos
-                                    fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                    fprintf(stderr, "error in NODATA TCP message creation\n");
                                     exit(-1);
                                 }
-
-                                writeTCP(external->fd, strlen(message_buffer), message_buffer);
                             }
+			    writeTCP(external->fd, strlen(message_buffer), message_buffer);
                         }
                         else
                         {
@@ -584,9 +571,7 @@ int main(int argc, char *argv[])
                                 errcode = snprintf(message_buffer, 150, "DATA %s\n", arg1);  
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                 {
-                                    // isto tá mal, o strncpy não afeta o errno!!
-                                    // deixo por agora para me lembrar de mudar em todos
-                                    fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                    fprintf(stderr, "error in DATA TCP message creation\n");
                                     exit(-1);
                                 }
 
@@ -616,9 +601,7 @@ int main(int argc, char *argv[])
 				    errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
                                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                     {
-                                        // isto tá mal, o strncpy não afeta o errno!!
-                                        // deixo por agora para me lembrar de mudar em todos
-                                        fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                        fprintf(stderr, "error in NODATA TCP message creation\n");
                                         exit(-1);
                                     }
                                     writeTCP(external->fd, strlen(message_buffer), message_buffer);	
@@ -709,7 +692,7 @@ int main(int argc, char *argv[])
                         errcode = snprintf(message_buffer, 150, "WITHDRAW %s\n", tab_aux->id_dest);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
-                            fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
+                            fprintf(stderr, "error in WITHDRAW TCP message creation\n");
                             exit(-1);
                         }
                         neigh_aux = int_neighbours;
@@ -776,9 +759,7 @@ int main(int argc, char *argv[])
                         errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
-                            // isto tá mal, o strncpy não afeta o errno!!
-                            // deixo por agora para me lembrar de mudar em todos
-                            fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                            fprintf(stderr, "error in EXTERN TCP message creation\n");
                             exit(-1);
                         }
                         writeTCP(external->fd, strlen(message_buffer), message_buffer);
@@ -803,7 +784,6 @@ int main(int argc, char *argv[])
                 // neste caso temos um backup, tornamos esse backup o nosso externo
                 else
                 {
-
                     // atualizar a informação do vizinho externo
                     strncpy(external->IP, backup->IP, NI_MAXHOST);
                     strncpy(external->port, backup->port, NI_MAXSERV);
@@ -813,12 +793,12 @@ int main(int argc, char *argv[])
                     connectTCP(external->IP, external->port, external->fd, 
                             "Error getting address info for external node when previous external closes connection\n", 
                             "Error connecting to external node when previous external closes connection\n");
-
+			
                     // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
                     errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                     {
-                        fprintf(stderr, "error in NEW TCP message creation when previous external closes connection: %s\n", strerror(errno));
+                        fprintf(stderr, "error in NEW TCP message creation when previous external closes connection\n");
                         exit(-1);
                     }
                     writeTCP(external->fd, strlen(message_buffer), message_buffer);
@@ -829,9 +809,7 @@ int main(int argc, char *argv[])
                         errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
-                            // isto tá mal, o strncpy não afeta o errno!!
-                            // deixo por agora para me lembrar de mudar em todos
-                            fprintf(stderr, "error in EXTERN message creation when there are only two nodes: %s\n", strerror(errno));
+                            fprintf(stderr, "error in EXTERN TCP message creation\n");
                             exit(-1);
                         }
                         neigh_aux = int_neighbours;
@@ -928,13 +906,9 @@ int main(int argc, char *argv[])
                                     errcode = snprintf(message_buffer, 150, "DATA %s\n", arg1);  
                                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                     {
-                                        // isto tá mal, o strncpy não afeta o errno!!
-                                        // deixo por agora para me lembrar de mudar em todos
-                                        fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                        fprintf(stderr, "error in DATA TCP message creation\n");
                                         exit(-1);
                                     }
-
-                                    writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                                 }
                                 else
                                 {
@@ -942,14 +916,11 @@ int main(int argc, char *argv[])
                                     errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
                                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                     {
-                                        // isto tá mal, o strncpy não afeta o errno!!
-                                        // deixo por agora para me lembrar de mudar em todos
-                                        fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                        fprintf(stderr, "error in NODATA TCP message creation\n");
                                         exit(-1);
                                     }
-
-                                    writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                                 }
+				writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                             }
                             else
                             {
@@ -960,12 +931,9 @@ int main(int argc, char *argv[])
                                     errcode = snprintf(message_buffer, 150, "DATA %s\n", arg1);  
                                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                     {
-                                        // isto tá mal, o strncpy não afeta o errno!!
-                                        // deixo por agora para me lembrar de mudar em todos
-                                        fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                        fprintf(stderr, "error in DATA TCP message creation\n");
                                         exit(-1);
                                     }
-
                                     writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                                 }
                                 else
@@ -992,9 +960,7 @@ int main(int argc, char *argv[])
 				        errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
                                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                         {
-                                            // isto tá mal, o strncpy não afeta o errno!!
-                                            // deixo por agora para me lembrar de mudar em todos
-                                            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                            fprintf(stderr, "error in NODATA TCP message creation\n");
                                             exit(-1);
                                         }
                                         writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);	
@@ -1091,7 +1057,7 @@ int main(int argc, char *argv[])
                             errcode = snprintf(message_buffer, 150, "WITHDRAW %s\n", tab_aux->id_dest);  
                             if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                             {
-                                fprintf(stderr, "error in WITHDRAW message creation when there are only two nodes: %s\n", strerror(errno));
+                                fprintf(stderr, "error in WITHDRAW TCP message creation\n");
                                 exit(-1);
                             }
                             neigh_tmp2 = int_neighbours;
@@ -1228,7 +1194,6 @@ int main(int argc, char *argv[])
                         // ao receber a lista, vai selecionar um nó qualquer e ligar-se a ele
                         // de momento, liga-se ao último nó da lista enviada, que (da maneira que a lista é preenchida)
                         // é o primeiro nó da nodes_fucking_list
-
                         num_nodes = 0;
                         // aqui, é preciso escrever código para limpar 
                         // a memória da lista anterior, caso ela exista
@@ -1251,7 +1216,7 @@ int main(int argc, char *argv[])
                         errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
-                            fprintf(stderr, "error in NEW TCP message creation: %s\n", strerror(errno));
+                            fprintf(stderr, "error in NEW TCP message creation\n");
                             exit(-1);
                         }
                         writeTCP(external->fd, strlen(message_buffer), message_buffer);
@@ -1266,9 +1231,7 @@ int main(int argc, char *argv[])
                         errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n",self.id);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
-                            // isto tá mal, o strncpy não afeta o errno!!
-                            // deixo por agora para me lembrar de mudar em todos
-                            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                            fprintf(stderr, "error in ADVERTISE TCP message creation\n");
                             exit(-1);
                         }
 
@@ -1283,7 +1246,7 @@ int main(int argc, char *argv[])
                         errcode = snprintf(message_buffer, 150, "REG %s %s %s", self.net, self.IP, self.port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
-                            fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
+                            fprintf(stderr, "error in REG UDP message creation\n");
                             exit(-1);
                         }
                         sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
@@ -1323,7 +1286,7 @@ int main(int argc, char *argv[])
                 errcode = snprintf(message_buffer, 150, "NODES %s", self.net);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 100)
                 {
-                    fprintf(stderr, "error in JOIN UDP message creation: %s\n", strerror(errno));
+                    fprintf(stderr, "error in NODES UDP message creation: %s\n");
                     exit(-1);
                 }
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in JOIN UDP message send\n");
@@ -1368,7 +1331,7 @@ int main(int argc, char *argv[])
                 errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                 {
-                    fprintf(stderr, "error in NEW TCP message creation in JOIN_LINK: %s\n", strerror(errno));
+                    fprintf(stderr, "error in NEW TCP message creation\n");
                     exit(-1);
                 }
                 writeTCP(external->fd, strlen(message_buffer), message_buffer);
@@ -1378,9 +1341,7 @@ int main(int argc, char *argv[])
                 errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n",self.id);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                 {
-                    // isto tá mal, o strncpy não afeta o errno!!
-                    // deixo por agora para me lembrar de mudar em todos
-                    fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                    fprintf(stderr, "error in ADVERTISE TCP message creation\n");
                     exit(-1);
                 }
 
@@ -1393,7 +1354,7 @@ int main(int argc, char *argv[])
                 errcode = snprintf(message_buffer, 150, "UNREG %s %s %s", self.net, self.IP, self.port);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                 {
-                    fprintf(stderr, "error in UNREG UDP message creation: %s\n", strerror(errno));
+                    fprintf(stderr, "error in UNREG UDP message creation\n");
                     exit(-1);
                 }
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in UNREG UDP message send\n");
@@ -1490,9 +1451,7 @@ int main(int argc, char *argv[])
                                 errcode = snprintf(message_buffer, 150, "INTEREST %s\n", user_input);  
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                 {
-                                    // isto tá mal, o strncpy não afeta o errno!!
-                                    // deixo por agora para me lembrar de mudar em todos
-                                    fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                    fprintf(stderr, "error in INTEREST TCP message creation\n");
                                     exit(-1);
                                 }
 
@@ -1786,12 +1745,10 @@ void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int 
 
     while(aux != NULL)
     {
-        errcode = snprintf(buffer, 150, "ADVERTISE %s\n",aux->id_dest);  
+        errcode = snprintf(buffer, 150, "ADVERTISE %s\n", aux->id_dest);  
         if (buffer == NULL || errcode < 0 || errcode >= 150)
         {
-            // isto tá mal, o strncpy não afeta o errno!!
-            // deixo por agora para me lembrar de mudar em todos
-            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+            fprintf(stderr, "error in ADVERTISE TCP message creation\n");
             exit(-1);  
         }
         writeTCP(fd, strlen(buffer), buffer);
@@ -1886,7 +1843,7 @@ list_objects *createinsertObject(list_objects *head, char *subname, char *id)
     errcode = snprintf(str_id, 150, "%s.", id);
     if (str_id == NULL || errcode < 0 || errcode >= 150)
     {
-        fprintf(stderr, "error in REG UDP message creation: %s\n", strerror(errno));
+        fprintf(stderr, "error in in filling string str_id\n");
         exit(-1);
     }
 
