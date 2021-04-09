@@ -298,7 +298,7 @@ int main(int argc, char *argv[])
     messages *msg_list, *msg_aux;
     no self;
     list_objects *head = NULL;
-    int i;
+    int i, flag_no_dest;
     char net[64], ident[64];
     char *id =  NULL;
 
@@ -593,6 +593,7 @@ int main(int argc, char *argv[])
                             }
                             else
                             {
+				flag_no_dest = 1;
 				// verifica se ja houve outro pedido do mesmo objeto feito
 			        if(checkInterest(first_interest, arg1, external->fd) != 1)
                                 {
@@ -605,9 +606,22 @@ int main(int argc, char *argv[])
                                     if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                                     {
                                         writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
+					flag_no_dest = 0;
                                     }
                                     tab_aux = tab_aux->next;
                                 }
+				if(flag_no_dest == 1)
+				{
+				    errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
+                                    if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                                    {
+                                        // isto tá mal, o strncpy não afeta o errno!!
+                                        // deixo por agora para me lembrar de mudar em todos
+                                        fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                        exit(-1);
+                                    }
+                                    writeTCP(external->fd, strlen(message_buffer), message_buffer);	
+				}
 			    }
                         }
 			free(id);
@@ -960,6 +974,7 @@ int main(int argc, char *argv[])
                                 }
                                 else
                                 {
+				    flag_no_dest = 1;
 			             // verifica se ja houve outro pedido do mesmo objeto feito 
 			            if(checkInterest(first_interest, arg1, neigh_aux->this->fd) != 1)
                                     {
@@ -972,9 +987,22 @@ int main(int argc, char *argv[])
                                         if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                                         {
                                             writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
+					    flag_no_dest = 0;
                                         }
                                         tab_aux = tab_aux->next;
-                                    }    
+                                    }
+				    if(flag_no_dest == 1)
+				    {
+				        errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
+                                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                                        {
+                                            // isto tá mal, o strncpy não afeta o errno!!
+                                            // deixo por agora para me lembrar de mudar em todos
+                                            fprintf(stderr, "error in ADVERTISE message creation when there are only two nodes: %s\n", strerror(errno));
+                                            exit(-1);
+                                        }
+                                        writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);	
+				    }
 				}
 		            }
 			    free(id);
