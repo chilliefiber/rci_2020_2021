@@ -1286,7 +1286,7 @@ int main(int argc, char *argv[])
                 errcode = snprintf(message_buffer, 150, "NODES %s", self.net);  
                 if (message_buffer == NULL || errcode < 0 || errcode >= 100)
                 {
-                    fprintf(stderr, "error in NODES UDP message creation: %s\n");
+                    fprintf(stderr, "error in NODES UDP message creation\n");
                     exit(-1);
                 }
                 sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in JOIN UDP message send\n");
