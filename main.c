@@ -261,6 +261,8 @@ int main(int argc, char *argv[])
 	}
 	argv[3] = "193.136.138.142";
 	argv[4] = "59000";
+	N = 2;
+        printf("Default cache size: %d\n",N);
     }
     // enum dos vários estados associados à rede de nós
     // NONODES no caso em que não existem nós
