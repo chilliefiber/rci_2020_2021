@@ -262,7 +262,6 @@ int main(int argc, char *argv[])
 	argv[3] = "193.136.138.142";
 	argv[4] = "59000";
 	N = 2;
-        printf("Default cache size: %d\n",N);
     }
     // enum dos vários estados associados à rede de nós
     // NONODES no caso em que não existem nós
@@ -292,7 +291,7 @@ int main(int argc, char *argv[])
     tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
     list_interest *first_interest = NULL, *interest_aux, *interest_tmp;
     cache_objects cache[N];
-    int n_obj = 0, obj_neigh;
+    int n_obj = 0;
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
     udp_state = not_waiting;
@@ -701,16 +700,10 @@ int main(int argc, char *argv[])
                 tab_aux = first_entry;
                 tab_tmp = NULL;
                 we_used_tab_tmp = 0;
-		obj_neigh = 0;
                 while(tab_aux != NULL)
                 {
                     if(tab_aux->fd_sock == external->fd)
                     {
-			if(obj_neigh == 0)
-                        {
-                            n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
-                            obj_neigh = 1;
-                        }
                         tab_tmp = tab_aux->next;
                         we_used_tab_tmp = 1;
                         errcode = snprintf(message_buffer, 150, "WITHDRAW %s\n", tab_aux->id_dest);  
@@ -725,6 +718,7 @@ int main(int argc, char *argv[])
                             writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                             neigh_aux = neigh_aux->next;
                         }
+			n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
                         deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
                     }
                     if (we_used_tab_tmp)
@@ -1088,16 +1082,10 @@ int main(int argc, char *argv[])
                     tab_aux = first_entry;
                     tab_tmp = NULL;
                     we_used_tab_tmp = 0;
-		    obj_neigh = 0;
                     while(tab_aux != NULL)
                     {
                         if(tab_aux->fd_sock == neigh_aux->this->fd)
                         {
-			    if(obj_neigh == 0)
-                            {
-                                n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
-                                obj_neigh = 1;
-                            }
                             tab_tmp = tab_aux->next;
                             we_used_tab_tmp = 1;
                             errcode = snprintf(message_buffer, 150, "WITHDRAW %s\n", tab_aux->id_dest);  
@@ -1115,9 +1103,9 @@ int main(int argc, char *argv[])
                                 }
                                 neigh_tmp2 = neigh_tmp2->next;
                             }
-
                             writeTCP(external->fd, strlen(message_buffer), message_buffer);
-                            deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
+                            n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
+			    deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
                         }
                         if (we_used_tab_tmp)
                         {
