@@ -611,41 +611,54 @@ int main(int argc, char *argv[])
 			free(id);
                     }
 
-                    // para quando recebemos uma mensagem DATA do vizinho externo, primeiro armazenamos o objeto na cache de objetos
-                    // depois reencaminhamos a mensagem para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
+                    // para quando recebemos uma mensagem DATA do vizinho externo, iteramos a lista de pedidos
                     if (!strcmp(command, "DATA") && word_count == 2)
                     {
-			if(checkCache(cache, arg1, n_obj) == 0)
-                        {
-                            n_obj++;
-                            n_obj = saveinCache(cache, arg1, n_obj);
- 
-			    interest_aux = first_interest;
-			    interest_tmp = NULL;
-			    we_used_interest_tmp = 0;
-			    while(interest_aux != NULL)
+			interest_aux = first_interest;
+			interest_tmp = NULL;
+			we_used_interest_tmp = 0;
+			while(interest_aux != NULL)
+			{
+			    // se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
+			    if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
 			    {
-			        if(!strcmp(interest_aux->obj, arg1))
-			        {
-			            interest_tmp = interest_aux->next;
-				    we_used_interest_tmp = 1;
-				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
-				    deleteInterest(&first_interest, arg1, interest_aux->fd);
-			        }
-			        if (we_used_interest_tmp)
-                                {
-                                    interest_aux = interest_tmp;
-                                    interest_tmp = NULL;
-                                    we_used_interest_tmp = 0;
-                                }
-                                else
-                                    interest_aux = interest_aux->next;
+			        interest_tmp = interest_aux->next;
+				we_used_interest_tmp = 1;
+				// verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
+				if(checkCache(cache, arg1, n_obj) == 0)
+				{
+			            n_obj++;
+                                    n_obj = saveinCache(cache, arg1, n_obj);
+				}
+				deleteInterest(&first_interest, arg1, interest_aux->fd);
 			    }
+			    // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
+			    else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
+		            {
+				interest_tmp = interest_aux->next;
+				we_used_interest_tmp = 1;
+				// verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
+				if(checkCache(cache, arg1, n_obj) == 0)
+				{
+			            n_obj++;
+                                    n_obj = saveinCache(cache, arg1, n_obj);
+				}
+				// reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
+				writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+				deleteInterest(&first_interest, arg1, interest_aux->fd);
+			    }
+		            if (we_used_interest_tmp)
+                            {
+                                interest_aux = interest_tmp;
+                                interest_tmp = NULL;
+                                we_used_interest_tmp = 0;
+                            }
+                            else
+                                interest_aux = interest_aux->next;
 			}
                     }
 
-                    // para quando recebemos uma mensagem NODATA do vizinho externo, NÃO PRECISAMOS de armazenar nada na cache de objetos
-                    // simplesmente reencaminhamos a mensagem de volta para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
+                    // para quando recebemos uma mensagem NODATA do vizinho externo, iteramos a lista de pedidos
                     if (!strcmp(command, "NODATA") && word_count == 2)
                     {	
 		        interest_aux = first_interest;
@@ -653,14 +666,23 @@ int main(int argc, char *argv[])
 			we_used_interest_tmp = 0;
 			while(interest_aux != NULL)
 			{
-			    if(!strcmp(interest_aux->obj, arg1))
+			    // se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
+			    if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
 			    {
 			        interest_tmp = interest_aux->next;
 				we_used_interest_tmp = 1;
+				deleteInterest(&first_interest, arg1, interest_aux->fd);
+			    }
+			    // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
+			    else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
+		            {
+				interest_tmp = interest_aux->next;
+				we_used_interest_tmp = 1;
+				// reencaminhamos a mensagem NODATA para o vizinho que fez esse pedido
 				writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
 				deleteInterest(&first_interest, arg1, interest_aux->fd);
 			    }
-			    if (we_used_interest_tmp)
+		            if (we_used_interest_tmp)
                             {
                                 interest_aux = interest_tmp;
                                 interest_tmp = NULL;
@@ -970,41 +992,54 @@ int main(int argc, char *argv[])
 			    free(id);
                         }
 
-                        // para quando recebemos uma mensagem DATA do vizinho interno, primeiro armazenamos o objeto na cache de objetos
-                        // depois reencaminhamos a mensagem para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
+                        // para quando recebemos uma mensagem DATA do vizinho interno, iteramos a lista de pedidos
                         if (!strcmp(command, "DATA") && word_count == 2)
                         {
-			    if(checkCache(cache, arg1, n_obj) == 0)
-                            {
-                                n_obj++;
-                                n_obj = saveinCache(cache, arg1, n_obj);
-
-			        interest_aux = first_interest;
-			        interest_tmp = NULL;
-			        we_used_interest_tmp = 0;
-			        while(interest_aux != NULL)
+			    interest_aux = first_interest;
+			    interest_tmp = NULL;
+			    we_used_interest_tmp = 0;
+			    while(interest_aux != NULL)
+			    {
+				// se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
+			        if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
 			        {
-				    if(!strcmp(interest_aux->obj, arg1))
+			            interest_tmp = interest_aux->next;
+				    we_used_interest_tmp = 1;
+			            // verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
+				    if(checkCache(cache, arg1, n_obj) == 0)
 				    {
-				        interest_tmp = interest_aux->next;
-				        we_used_interest_tmp = 1;
-				        writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
-				        deleteInterest(&first_interest, arg1, interest_aux->fd);
+			                n_obj++;
+                                        n_obj = saveinCache(cache, arg1, n_obj);
 				    }
-				    if (we_used_interest_tmp)
-                                    {
-                                        interest_aux = interest_tmp;
-                                        interest_tmp = NULL;
-                                        we_used_interest_tmp = 0;
-                                    }
-                                    else
-                                        interest_aux = interest_aux->next;
+				    deleteInterest(&first_interest, arg1, interest_aux->fd);
 			        }
-			    }
+				// se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
+			        else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
+		                {
+				    interest_tmp = interest_aux->next;
+				    we_used_interest_tmp = 1;
+			            // verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
+				    if(checkCache(cache, arg1, n_obj) == 0)
+				    {
+			                n_obj++;
+                                        n_obj = saveinCache(cache, arg1, n_obj);
+				    }
+			            // reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
+				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+				    deleteInterest(&first_interest, arg1, interest_aux->fd);
+			        }
+		                if (we_used_interest_tmp)
+                                {
+                                    interest_aux = interest_tmp;
+                                    interest_tmp = NULL;
+                                    we_used_interest_tmp = 0;
+                                }
+                                else
+                                    interest_aux = interest_aux->next;
+			    }   
                         }
 
-                        // para quando recebemos uma mensagem NODATA do vizinho interno, NÃO PRECISAMOS de armazenar nada na cache de objetos
-                        // simplesmente reencaminhamos a mensagem de volta para o vizinho de onde veio a mensagem de interesse iterando pela lista de pedidos
+                        // para quando recebemos uma mensagem NODATA do vizinho interno, iteramos a lista de pedidos
                         if (!strcmp(command, "NODATA") && word_count == 2)
                         {
 			    interest_aux = first_interest;
@@ -1012,14 +1047,23 @@ int main(int argc, char *argv[])
 			    we_used_interest_tmp = 0;
 			    while(interest_aux != NULL)
 			    {
-				if(!strcmp(interest_aux->obj, arg1))
-				{
+				// se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
+			        if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
+			        {
+			            interest_tmp = interest_aux->next;
+				    we_used_interest_tmp = 1;
+				    deleteInterest(&first_interest, arg1, interest_aux->fd);
+			        }
+				// se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
+			        else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
+		                {
 				    interest_tmp = interest_aux->next;
 				    we_used_interest_tmp = 1;
+				    // reencaminhamos a mensagem NODATA para o vizinho que fez esse pedido
 				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
 				    deleteInterest(&first_interest, arg1, interest_aux->fd);
-				}
-				if (we_used_interest_tmp)
+			        }
+		                if (we_used_interest_tmp)
                                 {
                                     interest_aux = interest_tmp;
                                     interest_tmp = NULL;
@@ -1454,8 +1498,8 @@ int main(int argc, char *argv[])
                                     fprintf(stderr, "error in INTEREST TCP message creation\n");
                                     exit(-1);
                                 }
-
                                 writeTCP(tab_aux->fd_sock, strlen(message_buffer), message_buffer);
+				first_interest = addInterest(first_interest, user_input, SELFFD);
                             }
                             tab_aux = tab_aux->next;
                         }
