@@ -604,7 +604,8 @@ int main(int argc, char *argv[])
                                         fprintf(stderr, "error in NODATA TCP message creation\n");
                                         exit(-1);
                                     }
-                                    writeTCP(external->fd, strlen(message_buffer), message_buffer);	
+                                    writeTCP(external->fd, strlen(message_buffer), message_buffer);
+				    deleteInterest(&first_interest, arg1, external->fd);
 				}
 			    }
                         }
@@ -985,7 +986,8 @@ int main(int argc, char *argv[])
                                             fprintf(stderr, "error in NODATA TCP message creation\n");
                                             exit(-1);
                                         }
-                                        writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);	
+                                        writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+				        deleteInterest(&first_interest, arg1, neigh_aux->this->fd);
 				    }
 				}
 		            }
