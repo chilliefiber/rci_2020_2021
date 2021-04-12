@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
     if(argc != 3 && argc != 5 && argc != 6)
     {
         printf("Invalid number of arguments!\n");
-        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
+        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
         exit(1);
     }
     
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
             printf("Invalid regIP address! Error in <argv[3]>\n");
             if(isPort(argv[4]) == 0)
             printf("Invalid regUDP port! Error in <argv[4]>\n");
-	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
+	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
             exit(1);
         }
     }
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
    	    if(N == 0)
 	    {
 	        printf("Invalid size for cache! Must be able to save at least 1 object!\n");
-		printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
+		printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
 		exit(1);
             }
             printf("Cache size: %d\n",N); 
@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
         else
         {
 	    printf("Invalid size for cache!\n");
-	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
+	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
 	    exit(1);   
         }
     }
@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
             printf("Invalid IP address! Error in <argv[1]>\n");
             if(isPort(argv[2]) == 0)
             printf("Invalid TCP port! Error in <argv[2]>\n");
-	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\nOptional Usage:\n./ndn IP TCP\n./ndn IP TCP regIP regUDP cache_size\n");
+	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
 	    exit(1);
 	}
 	argv[3] = "193.136.138.142";
@@ -2014,7 +2014,7 @@ int saveinCache(cache_objects cache[N], char *name, int n_obj)
 void printCache(cache_objects cache[N], int n_obj)
 {
     int i;
-    printf("Cache\nNº Objetos armazenados: %d\n",n_obj);
+    printf("Cache (Size:%d)\nNº objects stored: %d\n", N, n_obj);
     for(i=0; i<n_obj; i++)
     {
         printf("%s\n",cache[i].obj);
