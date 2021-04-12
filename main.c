@@ -74,6 +74,8 @@ void deleteInterestfd(list_interest **first_interest, int fd);
 
 int checkInterest(list_interest *first_interest, char *obj, int fd);
 
+void FreeInterestList(list_interest **first_interest);
+
 /**
 * getidfromName: função que extrai do nome introduzido pelo comando "get" o ientificador do nó destino para a pesquisa do objeto
 * \param user_input: ponteiro para a string correspondente ao nome introduzido pelo comando "get"
@@ -1445,6 +1447,7 @@ int main(int argc, char *argv[])
                 FreeTabExp(&first_entry);
                 FreeObjectList(&head);
                 FreeCache(cache,n_obj);
+		FreeInterestList(&first_interest);
                 n_obj = 0;
                 // indicar que não estamos ligados a qualquer rede
                 network_state = NONODES;
@@ -1669,6 +1672,22 @@ int checkInterest(list_interest *first_interest, char *obj, int fd)
     }
     // se não houver pedido igual
     return 0;
+}
+
+void FreeInterestList(list_interest **first_interest)
+{
+    list_interest *curr = *first_interest;
+    list_interest *next;
+
+    while(curr != NULL)
+    {
+        next = curr->next;
+	free(curr->obj);
+        free(curr);
+        curr = next;
+    }
+
+    *first_interest = NULL;
 }
 
 char *getidfromName(char *user_input, char *id)
