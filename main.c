@@ -1501,6 +1501,7 @@ int main(int argc, char *argv[])
                                     exit(-1);
                                 }
                                 writeTCP(tab_aux->fd_sock, strlen(message_buffer), message_buffer);
+				if(checkInterest(first_interest, user_input, SELFFD) != 1)
 				first_interest = addInterest(first_interest, user_input, SELFFD);
                             }
                             tab_aux = tab_aux->next;
