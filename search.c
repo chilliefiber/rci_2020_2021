@@ -94,6 +94,36 @@ void deleteInterestfd(list_interest **first_interest, int fd)
     }
 }
 
+void deleteInterestWITHDRAW(list_interest *first_interest, char *id)
+{
+    char *ident;
+    list_interest *interest_aux = first_interest;
+    list_interest *interest_tmp = NULL;
+    int we_used_interest_tmp = 0;
+    
+    while(interest_aux != NULL)
+    {
+	    ident = NULL;
+	    ident = getidfromName(interest_aux->obj, ident);
+        
+        if(!strcmp(ident, id))
+        {
+            interest_tmp = interest_aux->next;
+            we_used_interest_tmp = 1;
+            deleteInterest(&first_interest, interest_aux->obj, interest_aux->fd);
+        }
+
+        if(we_used_interest_tmp)
+        {
+            interest_aux = interest_tmp;
+            interest_tmp = NULL;
+            we_used_interest_tmp = 0;
+        }
+        else
+            interest_aux = interest_aux->next;
+    }
+}
+
 int checkInterest(list_interest *first_interest, char *obj, int fd)
 {
     list_interest *aux = first_interest;
