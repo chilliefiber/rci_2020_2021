@@ -24,7 +24,6 @@
 
 int main(int argc, char *argv[])
 {
-
     int errcode, N;
     char *regIP, *regUDP, *IP, *TCP;
     if(argc < 3 || argc > 6)
@@ -37,12 +36,15 @@ int main(int argc, char *argv[])
     {
         IP = argv[1];
         TCP = argv[2];
-        if(!isIP(IP))
-            printf("Invalid IP address! Error in IP argument\n");
-        if(!isPort(TCP))
-            printf("Invalid TCP port! Error in TCP argument\n");
-        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
-        exit(EXIT_FAILURE);
+        if(!isIP(IP) || !isPort(TCP))
+        {
+            if(!isIP(IP))
+                printf("Invalid IP address! Error in IP argument\n");
+            if(!isPort(TCP))
+                printf("Invalid TCP port! Error in TCP argument\n");
+            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
     if(argc == 5 || argc == 6)
@@ -76,8 +78,7 @@ int main(int argc, char *argv[])
                 printf("Invalid size for cache! Must be able to save at least 1 object!\n");
                 printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
                 exit(EXIT_FAILURE);
-            }
-            printf("Cache size: %d\n",N); 
+            } 
         }
         else
         {
@@ -147,7 +148,7 @@ int main(int argc, char *argv[])
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
-    safeGetAddrInfo(NULL, argv[2], &hints, &res, "Error getting address info for TCP server socket\n");
+    safeGetAddrInfo(NULL, TCP, &hints, &res, "Error getting address info for TCP server socket\n");
     if (bind(tcp_server_fd, res->ai_addr, res->ai_addrlen) == -1)
     {
         fprintf(stderr, "Error binding TCP server: %s\n", strerror(errno));
@@ -291,7 +292,7 @@ int main(int argc, char *argv[])
                                 fprintf(stderr, "error in REG UDP message creation\n");
                                 exit(-1);
                             }
-                            sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
+                            sendUDP(fd_udp, regIP, regUDP, message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
                             udp_state = waiting_for_regok;
                             printf("Acabámos de enviar o REG UDP\n");
                         }
@@ -319,8 +320,8 @@ int main(int argc, char *argv[])
                         writeTCP(external->fd, strlen(message_buffer), message_buffer);
                         network_state = MANYNODES; // em princípio este vai sair
                         // nesta situação, o nosso backup vamos ser nós próprios
-                        strncpy(backup->IP, argv[1], NI_MAXHOST); 
-                        strncpy(backup->port, argv[2], NI_MAXSERV);
+                        strncpy(backup->IP, IP, NI_MAXHOST); 
+                        strncpy(backup->port, TCP, NI_MAXSERV);
 
                         // enviar para todos os internos os dados do nosso vizinho externo
                         // isto porque caso estivéssemos sozinhos na rede e de repente se ligaram 
@@ -1080,7 +1081,6 @@ int main(int argc, char *argv[])
                         // e portanto não precisamos mais dela
                         list_of_nodes = NULL;
                         parseNodeListRecursive(list_msg, &list_of_nodes);
-                        // printf("%d\n",num_nodes);
                         external = safeMalloc(sizeof(viz));
                         external->next_av_ix = 0;
                         safeTCPSocket(&(external->fd));
@@ -1127,7 +1127,7 @@ int main(int argc, char *argv[])
                             fprintf(stderr, "error in REG UDP message creation\n");
                             exit(-1);
                         }
-                        sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
+                        sendUDP(fd_udp, regIP, regUDP, message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n");
                         udp_state = waiting_for_regok;
                     }
                 }
@@ -1157,8 +1157,8 @@ int main(int argc, char *argv[])
                 self.id = safeMalloc(strlen(ident)+1);
                 strcpy(self.id, ident);
 
-                strncpy(self.IP, argv[1], NI_MAXHOST);
-                strncpy(self.port, argv[2], NI_MAXSERV);
+                strncpy(self.IP, IP, NI_MAXHOST);
+                strncpy(self.port, TCP, NI_MAXSERV);
 
                 // criar string para enviar o pedido de nós
                 errcode = snprintf(message_buffer, 150, "NODES %s", self.net);  
@@ -1167,7 +1167,7 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "error in NODES UDP message creation\n");
                     exit(-1);
                 }
-                sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in JOIN UDP message send\n");
+                sendUDP(fd_udp, regIP, regUDP, message_buffer, "Error getting address information for UDP server socket\n", "error in JOIN UDP message send\n");
                 udp_state = waiting_for_list;
                 external_is_filled = 0;
             }
@@ -1194,8 +1194,8 @@ int main(int argc, char *argv[])
                 self.id = safeMalloc(strlen(ident)+1);
                 strcpy(self.id, ident);
 
-                strncpy(self.IP, argv[1], NI_MAXHOST);
-                strncpy(self.port, argv[2], NI_MAXSERV);
+                strncpy(self.IP, IP, NI_MAXHOST);
+                strncpy(self.port, TCP, NI_MAXSERV);
 
                 external->next_av_ix = 0;
                 safeTCPSocket(&(external->fd));
@@ -1235,7 +1235,7 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "error in UNREG UDP message creation\n");
                     exit(-1);
                 }
-                sendUDP(fd_udp, argv[3], argv[4], message_buffer, "Error getting address information for UDP server socket\n", "error in UNREG UDP message send\n");
+                sendUDP(fd_udp, regIP, regUDP, message_buffer, "Error getting address information for UDP server socket\n", "error in UNREG UDP message send\n");
                 udp_state = waiting_for_unregok;
 
                 // após tirar o registo no servidor de nós, devemos terminar todas as conexões TCP ativas 
@@ -1397,4 +1397,3 @@ int main(int argc, char *argv[])
     }	
     return 0;
 }
-
