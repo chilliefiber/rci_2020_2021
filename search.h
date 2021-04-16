@@ -26,6 +26,8 @@ void deleteInterest(list_interest **first_interest, char *obj, int fd);
 
 void deleteInterestfd(list_interest **first_interest, int fd);
 
+void deleteInterestWITHDRAW(list_interest *first_interest, char *id);
+
 int checkInterest(list_interest *first_interest, char *obj, int fd);
 
 void FreeInterestList(list_interest **first_interest);
