@@ -1,7 +1,13 @@
 #ifndef ERROR_CHECKING_H
 #define ERROR_CHECKING_H
 
+#define END_EXECUTION 0
+#define LEAVE_NETWORK 1
+#define NO_ERROR 2
+
 #include <stddef.h>
+#include <netdb.h>
+
 void* safeMalloc(size_t size);
 void sendUDP(int fd, char* ip, char* port, char* text, char* addrinfo_error_msg, char* send_error_msg);
 void safeGetAddrInfo(char* ip, char* port, struct addrinfo *hints, struct addrinfo **res, char* error_msg);

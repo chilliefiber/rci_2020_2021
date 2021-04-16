@@ -8,32 +8,25 @@
 
 extern int errno;
 
-void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
+int parseNodeListRecursive(char* datagram, node_list **list)
 {
     int rvalue;
     node_list *this = safeMalloc(sizeof(node_list));
     this->next = NULL;
-    // nota importante:
-    // cheira me que o sscanf faria cocó caso houvesse mais
-    // caracteres na primeira/segunda palavra do datagram
-    // do que no this->IP/this->port. Nomeadamente, penso
-    // que não iria colocar o \0. Isso é problemático porque
-    // no main fazemos strncpy daqui, e o strncpy não mete \0
-    // se não chegarmos a um \0
-    // nesse caso, seria apropriado colocar um \0
-    // em this->IP/this->port no ultimo indice aqui
-    // ou possivelmente no ultimo indice da string dest para onde fazemos
-    // strncpy
     rvalue = sscanf(datagram,"%s %s\n", this->IP, this->port);
-    if (rvalue == EOF){
-        fprintf(stderr, "error in parseNodeListRecursive(): %s\n", strerror(errno));
+    // um EOF indica muito provavelmente um erro no sscanf mesmo (visto que estamos a ler para string)
+    // Então fechamos o programa
+    if (rvalue == EOF)
+    {
+        fprintf(stderr, "error in parseNodeListRecursive() sscanf: %s\n", strerror(errno)); 
+        return END_EXECUTION;
     }
     // neste caso houve um erro mas devido a uma mensagem mal formatada
     // sendo assim vamos devolver uma lista a NULL para sinalizar esse erro, mas
     // não paramos o programa
-    else if(rvalue != 2){
+    if(rvalue != 2){
         *list = NULL;
-        return;
+        return LEAVE_NETWORK;
     }
     // como não interessa a ordem porque sai a lista, inserimos cada nó IP/port
     // no início da lista
@@ -41,7 +34,6 @@ void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
     // NODESLIST, *list == NULL, isto funciona
     this->next = *list;
     *list = this;
-    *num_nodes = (*num_nodes) + 1;
     int ix =0;
     char c = datagram[ix];
     // obrigatoriamente tem um \n devido ao sscanf, se aquilo
@@ -53,7 +45,9 @@ void parseNodeListRecursive(char* datagram, int *num_nodes, node_list **list)
     // se o próximo caractere for \0, lemos o dgram todo
     // caso contrário, vamos ler mais uma linha
     if (datagram[ix + 1] != '\0')
-        parseNodeListRecursive(datagram + ix + 1, num_nodes, list);
+        return parseNodeListRecursive(datagram + ix + 1, list);
+    
+    return NO_ERROR;
 }
 
 

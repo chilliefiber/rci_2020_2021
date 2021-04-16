@@ -2,7 +2,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include <netdb.h>
+// #include <netdb.h> esta foi incluída no header file porque 
+// dava erro ao utilizar funções do tcp.c em ficheiros que não o main
+// caso não estivesse lá, devido à declaração do NI_MAXHOST/NI_MAXSERV
 #include "tcp.h"
 #include "errcheck.h"
 #include <stdio.h> // depois tirar este
@@ -24,8 +26,12 @@ char writeTCP(int fd, ssize_t nleft, char *buffer)
 
 messages* messagesAlloc(void)
 {
-  messages* new = safeMalloc(sizeof(messages));
-  new->message = safeCalloc(N_MAX+1, sizeof(char));
+  messages* new = malloc(sizeof(messages));
+  if (!new)
+      return NULL;
+  new->message = calloc(N_MAX+1, sizeof(char));
+  if (!new->message)
+      return NULL;
   new->next = NULL;
   return new;
 }

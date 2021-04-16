@@ -1,3 +1,18 @@
+Chamar no safeMalloc o safeExit
+
+COMUNICAÇÃO UDP
+1- Adicionar timer no select! 3 tentativas para o envio e depois abandonar rede
+2 - Timer no select: 5 segundos para receber o Unreg e a NODESLIST
+3 - Caso NODESLIST se não recebermos abandonamos a rede
+4 - Caso unreg se não recebermos reenviamos 2 vezes e depois se à terceira não recebermos nada assumimos que funcionou
+
+JOIN para um qualquer
+Caso o join falhe, testar com outros bacanos da lista
+
+JOIN para um especifico
+Caso o join falhe, ficar NONODES, e devolver o controlo ao utilizador
+
+
 LEAVE FASE 2
 
 Implementação:

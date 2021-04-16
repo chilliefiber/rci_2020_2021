@@ -1,0 +1,22 @@
+Erros de tudo o que não seja redes (malloc, calloc, memset) fechar programa
+
+Erro de JOIN_LINK
+-Falha na conexão com o nó selecionado => notificar erro, devolver programa ao utilizador (para poder fazer outras coisas)
+
+Erro de JOIN_ID
+-Falha na conexão com o nó => iterar pela NODESLIST, tentar todos os nós até algum dar. Caso falhem todos, notificar erro, devolver programa ao utilizador (para poder fazer outras coisas)
+
+Mensagem mal formatada vinda do servidor de nós
+-Sair da rede
+
+Erro de sscanf com EOF
+-sscanf em geral é mau e evitável mas diz para usar. Mesmo que dê EOF, ele pode não settar o errno de acordo com a manpage e com https://wiki.sei.cmu.edu/confluence/display/c/INT05-C.+Do+not+use+input+functions+to+convert+character+data+if+they+cannot+handle+all+possible+inputs No entanto, caso o errno não esteja settado o strerror(errno) diz Sucess
+
+Erro na criação da socket TCP para o serviro
+-crashar programa
+
+COMUNICAÇÃO UDP
+1- Adicionar timer no select! 3 tentativas para o envio e depois abandonar rede
+2 - Timer no select: 5 segundos para receber o Unreg e a NODESLIST
+3 - Caso NODESLIST se não recebermos abandonamos a rede
+4 - Caso unreg se não recebermos reenviamos 2 vezes e depois se à terceira não recebermos nada assumimos que funcionou

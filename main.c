@@ -15,264 +15,95 @@
 #include "udp_parser.h"
 #include "errcheck.h"
 #include "tcp.h"
+#include "routing.h"
+#include "search.h"
+#include "nodes.h"
+
 #define max(A,B) ((A)>=(B)?(A):(B))
-
-
-// #define N 2 //capacidade da cache de objetos do nó
 #define SELFFD -1
-int N;
-
-// tabela de expedição 
-typedef struct tab_entry{
-    char *id_dest;
-    int fd_sock;
-    struct tab_entry *next;
-}tab_entry;
-
-// estrutura para um slot da cache dos objetos
-typedef struct cache_objects{
-    char *obj;
-}cache_objects;
-
-// estrutura auxiliar para cache (caso WITHDRAW retirar elementos com o id)
-typedef struct cache_aux{
-    char *obj;
-    struct cache_aux *next;
-}cache_aux;
-
-typedef struct no{
-    char *net; //identificador da rede
-    char *id;    //identificador do nó
-    char IP[NI_MAXHOST]; //endereço IP do nó
-    char port[NI_MAXSERV]; //Porto TCP do nó
-}no;
-
-// lista dos vizinhos internos do nó
-typedef struct internals{
-    struct viz *this;
-    struct internals *next;
-}internals;
-
-// lista de objetos nomeados do nó
-typedef struct list_objects{
-    char *objct;
-    struct list_objects *next;
-}list_objects;
-
-// lista de pedidos (interesse de vizinhos)
-typedef struct list_interest{
-    int fd;
-    char *obj;
-    struct list_interest *next;
-}list_interest;
-
-list_interest *addInterest(list_interest *first_interest, char *obj, int fd);
-
-void deleteInterest(list_interest **first_interest, char *obj, int fd);
-
-void deleteInterestfd(list_interest **first_interest, int fd);
-
-int checkInterest(list_interest *first_interest, char *obj, int fd);
-
-void FreeInterestList(list_interest **first_interest);
-
-/**
-* getidfromName: função que extrai do nome introduzido pelo comando "get" o ientificador do nó destino para a pesquisa do objeto
-* \param user_input: ponteiro para a string correspondente ao nome introduzido pelo comando "get"
-* \param id: ponteiro para a string correspondente ao identificador do nó que será retornado no final desta função
-*/
-char *getidfromName(char *user_input, char *id);
-
-/**
-* createinsertTabEntry: função que cria uma entrada na tabela de expedição (basicamente cria e adiciona um nó a lista simplesmente ligada) e retorna o topo da lista atualizado no final
-* \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
-* \param id_dst: ponteiro para a string correspondente ao identificador do nó destino correspondente à entrada da tabela que se vai adicionar
-* \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP que nos permite chegar ào nó destino 
-*/
-tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd);
-
-/**
-* deleteTabEntryid: função que recebe como argumento o id do nó e que e elimina a respetiva entrada da tabela de expedição (basicamente deleta um nó da lista simplesmente ligada) 
-* \param first_entry: duplo ponteiro para a primeira entrada da tabela de expedição (topo da lista)
-* \param id_out: ponteiro para a string correspondente ao identificador do nó cuja entrada correspondente vai ser eliminada
-*/
-void deleteTabEntryid(tab_entry **first_entry, char *id_out);
-
-/**
-* deleteTabEntryfd: função que recebe como argumento o fd do nó e que e elimina a respetiva entrada da tabela de expedição (basicamente deleta um nó da lista simplesmente ligada) 
-* \param first_entry: duplo ponteiro para a primeira entrada da tabela de expedição (topo da lista)
-* \param fd_out: inteiro correspondente ao file descriptor que está associado à sessão TCP que nos permitia chegar ào nó destino, a entrada correspondente vai ser eliminada
-*/
-void deleteTabEntryfd(tab_entry **first_entry, int fd_out);
-
-/** writeAdvtoEntryNode: função que escreve tantas mensagens ADVERTISE quantas as entradas existentes na tabela de expedição
-* \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
-* \param errcode: inteiro utilizado para verificação de erro na conversão do snprintf()
-* \param buffer: ponteiro para string onde será armazenada a mensagem que será enviada por TCP
-* \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP que nos permite chegar ào nó destino 
-*/
-void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int fd);
-
-/** checkTabEntry: função que verifica se existe na tabela de expedição uma entrada com o identificador id (importante para pesquisa de objetos nomeados)
-* \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
-* \param id: ponteiro para a string correspondente ao identificador do nó
-* \retorna 1 se existir a entrada na tabela e retorna 0 caso não exista
-*/
-int checkTabEntry(tab_entry *first_entry, char *id);
-
-/** printTabExp: função que imprime a tabela de expedição do nó da aplicação
-* \param first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
-*/
-void printTabExp(tab_entry *first_entry);
-
-/** FreeTabExp: função que liberta a tabela de expedição (desaloca a memória alocada pelas entradas)
-* \param first_entry: duplo ponteiro para a primeira entrada da tabela de expedição (topo da lista)
-*/
-void FreeTabExp(tab_entry **first_entry);
-
-/** getConcatString: função que concatena duas strings numa só e retorna no final o ponteiro para string resultante (utilizada na criação de objetos para juntar id ao subnome)
-* \param str1: ponteiro para a primeira string (corresponderá ao identificador do nó)
-* \param str2: ponteiro para a segunda string (corresponderá ao subnome do objeto)
-*/
-char *getConcatString( const char *str1, const char *str2);
-
-/** checkObjectList: função que verifica se existe um determinado objeto na lista de objetos nomeados do nó (importante para pesquisa de objetos nomeados)
-* \param head_obj: ponteiro para o primeiro objeto da lista de objetos (topo da lista)
-* \param name: ponteiro para a string correspondente ao nome do objeto a verificar
-* \retorna 1 se existir o objeto na lista e retorna 0 caso não exista
-*/
-int checkObjectList(list_objects *head_obj, char *name);
-
-/**
-* createinsertObject: função que cria um objeto e adiciona a lista de objetos nomeados do nó (basicamente cria e adiciona um nó a lista simplesmente ligada) e retorna o topo da lista atualizado no final
-* \param head: ponteiro para o primeiro objeto da lista de objetos (topo da lista)
-* \param subname: ponteiro para a string correspondente ao subnome do objeto introduzido no comando "create"
-* \param id: ponteiro para a string correspondente ao identificador do nó da aplicação 
-*/
-list_objects *createinsertObject(list_objects *head, char *subname, char *id);
-
-/** printTabExp: função que imprime a lista de objetos nomeados do nó da aplicação
-* \param head_obj: ponteiro para o primeiro objeto da lista de objetos (topo da lista)
-*/
-void printObjectList(list_objects *head_obj);
-
-/** FreeObjectList: função que liberta a lista de objetos nomeados (desaloca a memória alocada pelos objetos(nós) da lista)
-* \param head_obj: duplo ponteiro para o primeiro objeto da lista de objetos (topo da lista)
-*/
-void FreeObjectList(list_objects **head_obj);
-
-/** checkCache: função que verifica se existe um determinado objeto na cache do nó (importante para pesquisa de objetos nomeados)
-* \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dso objetos em slots da cache
-* \param name: ponteiro para a string correspondente ao nome do objeto a verificar
-* \param n_obj: inteiro correspondente ao número de objetos presentes na cache
-* \retorna 1 se existir o objeto na cache e retorna 0 caso não exista
-*/
-int checkCache(cache_objects cache[N], char *name, int n_obj);
-
-/** saveinCache: função que guarda um determinado objeto na cache do nó (importante para pesquisa de objetos nomeados), estando implementado o método Least Recently Used
-* \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dos objetos em slots na cache
-* \param name: ponteiro para a string correspondente ao nome do objeto a verificar
-* \param n_obj: inteiro correspondente ao número de objetos presentes na cache
-* \retorna 1 se existir o objeto na cache e retorna 0 caso não exista
-*/
-int saveinCache(cache_objects cache[N], char *name, int n_obj);
-
-/** printTabExp: função que imprime os objetos que se encontram na cache do nó da aplicação
-* \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dos objetos em slots na cache
-* \param n_obj: inteiro correspondente ao número de objetos presentes na cache
-*/
-void printCache(cache_objects cache[N], int n_obj);
-
-/** FreeCache: função que liberta a cache (desaloca a memória alocada nas várias posições da cache correpondente as strings dos objetos)
-* \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dos objetos em slots na cache
-* \param n_obj: inteiro correspondente ao número de objetos presentes na cache
-*/
-void FreeCache(cache_objects cache[N], int n_obj);
-
-int deleteCacheid(cache_objects cache[N], int n_obj, char *id);
-
-cache_aux *createinsertCacheAux(cache_aux *head_c, char *objct);
-
-void FreeCacheAuxList(cache_aux **head_c);
-
-void addToList(internals **int_neighbours, viz *new);
 
 int main(int argc, char *argv[])
 {
-    if(argc != 3 && argc != 5 && argc != 6)
+
+    int errcode, N;
+    char *regIP, *regUDP, *IP, *TCP;
+    if(argc < 3 || argc > 6)
     {
         printf("Invalid number of arguments!\n");
-        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
-        exit(1);
+        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+        exit(EXIT_FAILURE);
     }
-    
+    else
+    {
+        IP = argv[1];
+        TCP = argv[2];
+        if(!isIP(IP))
+            printf("Invalid IP address! Error in IP argument\n");
+        if(!isPort(TCP))
+            printf("Invalid TCP port! Error in TCP argument\n");
+        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+        exit(EXIT_FAILURE);
+    }
+
     if(argc == 5 || argc == 6)
     {
-        if(isIP(argv[1]) == 0 || isPort(argv[2]) == 0 || isIP(argv[3]) == 0 || isPort(argv[4]) == 0)
+        regIP = argv[3];
+        regUDP = argv[4];
+        if(!isIP(regIP) || !isPort(regUDP))
         {
-            if(isIP(argv[1]) == 0)
-            printf("Invalid IP address! Error in <argv[1]>\n");
-            if(isPort(argv[2]) == 0)
-            printf("Invalid TCP port! Error in <argv[2]>\n");
-            if(isIP(argv[3]) == 0)
-            printf("Invalid regIP address! Error in <argv[3]>\n");
-            if(isPort(argv[4]) == 0)
-            printf("Invalid regUDP port! Error in <argv[4]>\n");
-	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
-            exit(1);
+            if(!isIP(regIP))
+                printf("Invalid regIP address! Error in regIP argument\n");
+            if(!isPort(regUDP))
+                printf("Invalid regUDP port! Error in regUDP argument\n");
+            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+            exit(EXIT_FAILURE);
         }
     }
-    
-    if(argc == 6)
+
+    if(argc == 6 || argc == 4)
     {
-        if(checkDigit(argv[5]) == 1)
-	{
-	    N = atoi(argv[5]);
-   	    if(N == 0)
-	    {
-	        printf("Invalid size for cache! Must be able to save at least 1 object!\n");
-		printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
-		exit(1);
+        if(checkDigit(argv[argc - 1]) == 1)
+        {
+            if ((errcode = sscanf(argv[argc-1], "%d", &N)) == EOF)
+                fprintf(stderr, "Error reading size of cache: %s\n", strerror(errno));
+            // é pouco explícito na man page o que acontece para o caso de devolver 0, assumimos que não mexe no ERRNO
+            else if(!errcode)
+                fprintf(stderr, "Error reading size of cache\n");
+            if (errcode != 1)
+                exit(EXIT_FAILURE);
+            if(N == 0)
+            {
+                printf("Invalid size for cache! Must be able to save at least 1 object!\n");
+                printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+                exit(EXIT_FAILURE);
             }
             printf("Cache size: %d\n",N); 
-	}
+        }
         else
         {
-	    printf("Invalid size for cache!\n");
-	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
-	    exit(1);   
+            printf("Invalid size for cache!\n");
+            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+            exit(EXIT_FAILURE);   
         }
     }
-	
-    if(argc == 5) 
-    {
+
+    if(argc == 5 || argc == 3) 
         N = 2;
-    }
-    
-    if(argc == 3)
+
+    if(argc == 3 || argc == 4)
     {
-        if(isIP(argv[1]) == 0 || isPort(argv[2]) == 0)
-        {
-	    if(isIP(argv[1]) == 0)
-            printf("Invalid IP address! Error in <argv[1]>\n");
-            if(isPort(argv[2]) == 0)
-            printf("Invalid TCP port! Error in <argv[2]>\n");
-	    printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n");
-	    exit(1);
-	}
-	argv[3] = "193.136.138.142";
-	argv[4] = "59000";
-	N = 2;
+        regIP = "193.136.138.142";
+        regUDP = "59000";
     }
     // enum dos vários estados associados à rede de nós
     // NONODES no caso em que não existem nós
     // MANYNODES no caso em que a rede tem mais que dois nós
     enum {NONODES, ONENODE, MANYNODES} network_state;
     network_state = NONODES;
-    node_list *nodes_fucking_list;
+    node_list *list_of_nodes;
     fd_set rfds;
-    int num_nodes, fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0;
-    int errcode, external_is_filled, we_used_tab_tmp, we_used_interest_tmp;
+    int fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0;
+    int external_is_filled, we_used_tab_tmp, we_used_interest_tmp;
     enum instr instr_code;
     char *user_input, flag, tcp_read_flag;
     char command[150], arg1[150], arg2[150];
@@ -291,7 +122,7 @@ int main(int argc, char *argv[])
 
     tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
     list_interest *first_interest = NULL, *interest_aux, *interest_tmp;
-    cache_objects cache[N];
+    char **cache = safeMalloc(N*sizeof(char*));
     int n_obj = 0;
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
@@ -309,7 +140,7 @@ int main(int argc, char *argv[])
     memset(&act, 0, sizeof act);
     act.sa_handler = SIG_IGN;
     if(sigaction(SIGPIPE, &act, NULL) == -1) exit(1);
-    
+
     if ((fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) == -1) exit(1);
     safeTCPSocket(&tcp_server_fd);
     memset(&hints, 0, sizeof(hints));
@@ -529,14 +360,14 @@ int main(int argc, char *argv[])
                             neigh_aux = neigh_aux->next;
                         }
                         deleteTabEntryid(&first_entry, arg1);
-			n_obj = deleteCacheid(cache, n_obj, arg1);
+                        n_obj = deleteCacheid(cache, n_obj, arg1);
                     }
 
                     //para quando recebemos uma mensagem INTEREST do vizinho externo
                     if (!strcmp(command, "INTEREST") && word_count == 2)
                     {
                         id = NULL;
-		        id = getidfromName(arg1, id);
+                        id = getidfromName(arg1, id);
 
                         // verificar primeiro se o identificador do objeto corresponde ao nosso (se somos o destino da mensagem de interesse)    
                         if(!strcmp(self.id, id))
@@ -562,7 +393,7 @@ int main(int argc, char *argv[])
                                     exit(-1);
                                 }
                             }
-			    writeTCP(external->fd, strlen(message_buffer), message_buffer);
+                            writeTCP(external->fd, strlen(message_buffer), message_buffer);
                         }
                         else
                         {
@@ -581,76 +412,76 @@ int main(int argc, char *argv[])
                             }
                             else
                             {
-				flag_no_dest = 1;
-				// verifica se ja houve outro pedido do mesmo objeto feito
-			        if(checkInterest(first_interest, arg1, external->fd) != 1)
+                                flag_no_dest = 1;
+                                // verifica se ja houve outro pedido do mesmo objeto feito
+                                if(checkInterest(first_interest, arg1, external->fd) != 1)
                                 {
-				    first_interest = addInterest(first_interest, arg1, external->fd);
-				}
-				// se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
+                                    first_interest = addInterest(first_interest, arg1, external->fd);
+                                }
+                                // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
                                 tab_aux = first_entry;
                                 while(tab_aux != NULL)
                                 {
                                     if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                                     {
                                         writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
-					flag_no_dest = 0;
+                                        flag_no_dest = 0;
                                     }
                                     tab_aux = tab_aux->next;
                                 }
-				if(flag_no_dest == 1)
-				{
-				    errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
+                                if(flag_no_dest == 1)
+                                {
+                                    errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
                                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                     {
                                         fprintf(stderr, "error in NODATA TCP message creation\n");
                                         exit(-1);
                                     }
                                     writeTCP(external->fd, strlen(message_buffer), message_buffer);
-				    deleteInterest(&first_interest, arg1, external->fd);
-				}
-			    }
+                                    deleteInterest(&first_interest, arg1, external->fd);
+                                }
+                            }
                         }
-			free(id);
+                        free(id);
                     }
 
                     // para quando recebemos uma mensagem DATA do vizinho externo, iteramos a lista de pedidos
                     if (!strcmp(command, "DATA") && word_count == 2)
                     {
-			interest_aux = first_interest;
-			interest_tmp = NULL;
-			we_used_interest_tmp = 0;
-			while(interest_aux != NULL)
-			{
-			    // se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
-			    if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
-			    {
-			        interest_tmp = interest_aux->next;
-				we_used_interest_tmp = 1;
-				// verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
-				if(checkCache(cache, arg1, n_obj) == 0)
-				{
-			            n_obj++;
-                                    n_obj = saveinCache(cache, arg1, n_obj);
-				}
-				deleteInterest(&first_interest, arg1, interest_aux->fd);
-			    }
-			    // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
-			    else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
-		            {
-				interest_tmp = interest_aux->next;
-				we_used_interest_tmp = 1;
-				// verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
-				if(checkCache(cache, arg1, n_obj) == 0)
-				{
-			            n_obj++;
-                                    n_obj = saveinCache(cache, arg1, n_obj);
-				}
-				// reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
-				writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
-				deleteInterest(&first_interest, arg1, interest_aux->fd);
-			    }
-		            if (we_used_interest_tmp)
+                        interest_aux = first_interest;
+                        interest_tmp = NULL;
+                        we_used_interest_tmp = 0;
+                        while(interest_aux != NULL)
+                        {
+                            // se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
+                            if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
+                            {
+                                interest_tmp = interest_aux->next;
+                                we_used_interest_tmp = 1;
+                                // verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
+                                if(checkCache(cache, arg1, n_obj) == 0)
+                                {
+                                    n_obj++;
+                                    n_obj = saveinCache(cache, arg1, n_obj, N);
+                                }
+                                deleteInterest(&first_interest, arg1, interest_aux->fd);
+                            }
+                            // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
+                            else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
+                            {
+                                interest_tmp = interest_aux->next;
+                                we_used_interest_tmp = 1;
+                                // verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
+                                if(checkCache(cache, arg1, n_obj) == 0)
+                                {
+                                    n_obj++;
+                                    n_obj = saveinCache(cache, arg1, n_obj, N);
+                                }
+                                // reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
+                                writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+                                deleteInterest(&first_interest, arg1, interest_aux->fd);
+                            }
+                            if (we_used_interest_tmp)
                             {
                                 interest_aux = interest_tmp;
                                 interest_tmp = NULL;
@@ -658,34 +489,34 @@ int main(int argc, char *argv[])
                             }
                             else
                                 interest_aux = interest_aux->next;
-			}
+                        }
                     }
 
                     // para quando recebemos uma mensagem NODATA do vizinho externo, iteramos a lista de pedidos
                     if (!strcmp(command, "NODATA") && word_count == 2)
                     {	
-		        interest_aux = first_interest;
-			interest_tmp = NULL;
-			we_used_interest_tmp = 0;
-			while(interest_aux != NULL)
-			{
-			    // se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
-			    if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
-			    {
-			        interest_tmp = interest_aux->next;
-				we_used_interest_tmp = 1;
-				deleteInterest(&first_interest, arg1, interest_aux->fd);
-			    }
-			    // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
-			    else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
-		            {
-				interest_tmp = interest_aux->next;
-				we_used_interest_tmp = 1;
-				// reencaminhamos a mensagem NODATA para o vizinho que fez esse pedido
-				writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
-				deleteInterest(&first_interest, arg1, interest_aux->fd);
-			    }
-		            if (we_used_interest_tmp)
+                        interest_aux = first_interest;
+                        interest_tmp = NULL;
+                        we_used_interest_tmp = 0;
+                        while(interest_aux != NULL)
+                        {
+                            // se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
+                            if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
+                            {
+                                interest_tmp = interest_aux->next;
+                                we_used_interest_tmp = 1;
+                                deleteInterest(&first_interest, arg1, interest_aux->fd);
+                            }
+                            // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
+                            else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
+                            {
+                                interest_tmp = interest_aux->next;
+                                we_used_interest_tmp = 1;
+                                // reencaminhamos a mensagem NODATA para o vizinho que fez esse pedido
+                                writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+                                deleteInterest(&first_interest, arg1, interest_aux->fd);
+                            }
+                            if (we_used_interest_tmp)
                             {
                                 interest_aux = interest_tmp;
                                 interest_tmp = NULL;
@@ -693,7 +524,7 @@ int main(int argc, char *argv[])
                             }
                             else
                                 interest_aux = interest_aux->next;
-			}
+                        }
                     }
 
                     msg_aux = msg_list;
@@ -726,7 +557,7 @@ int main(int argc, char *argv[])
                             writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                             neigh_aux = neigh_aux->next;
                         }
-			n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
+                        n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
                         deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
                     }
                     if (we_used_tab_tmp)
@@ -738,19 +569,19 @@ int main(int argc, char *argv[])
                     else
                         tab_aux = tab_aux->next;
                 }
-		    
-		interest_aux = first_interest;
-		interest_tmp = NULL;
-		we_used_interest_tmp = 0;
-		while(interest_aux != NULL)
-		{
-	 	    if(interest_aux->fd == external->fd)
-		    {
-		        interest_tmp = interest_aux->next;
-			we_used_interest_tmp = 1;
-			deleteInterestfd(&first_interest, interest_aux->fd);
-	            }
-		    if (we_used_interest_tmp)
+
+                interest_aux = first_interest;
+                interest_tmp = NULL;
+                we_used_interest_tmp = 0;
+                while(interest_aux != NULL)
+                {
+                    if(interest_aux->fd == external->fd)
+                    {
+                        interest_tmp = interest_aux->next;
+                        we_used_interest_tmp = 1;
+                        deleteInterestfd(&first_interest, interest_aux->fd);
+                    }
+                    if (we_used_interest_tmp)
                     {
                         interest_aux = interest_tmp;
                         interest_tmp = NULL;
@@ -758,7 +589,7 @@ int main(int argc, char *argv[])
                     }
                     else
                         interest_aux = interest_aux->next;
-		}
+                }
 
                 if ((errcode = close(external->fd)))
                 {
@@ -818,7 +649,7 @@ int main(int argc, char *argv[])
                     connectTCP(external->IP, external->port, external->fd, 
                             "Error getting address info for external node when previous external closes connection\n", 
                             "Error connecting to external node when previous external closes connection\n");
-			
+
                     // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
                     errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -912,14 +743,14 @@ int main(int argc, char *argv[])
                             }
                             writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
                             deleteTabEntryid(&first_entry, arg1);
-			    n_obj = deleteCacheid(cache, n_obj, arg1);
+                            n_obj = deleteCacheid(cache, n_obj, arg1);
                         }
 
                         // para quando recebemos uma mensagem INTEREST dum vizinho interno
                         if (!strcmp(command, "INTEREST") && word_count == 2)
                         {
                             id = NULL;
-			    id = getidfromName(arg1, id);
+                            id = getidfromName(arg1, id);
 
                             // verificar primeiro se o identificador do objeto corresponde ao nosso (se somos o destino da mensagem de interesse)		
                             if(!strcmp(self.id, id))
@@ -945,7 +776,7 @@ int main(int argc, char *argv[])
                                         exit(-1);
                                     }
                                 }
-				writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                                writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                             }
                             else
                             {
@@ -963,76 +794,76 @@ int main(int argc, char *argv[])
                                 }
                                 else
                                 {
-				    flag_no_dest = 1;
-			             // verifica se ja houve outro pedido do mesmo objeto feito 
-			            if(checkInterest(first_interest, arg1, neigh_aux->this->fd) != 1)
+                                    flag_no_dest = 1;
+                                    // verifica se ja houve outro pedido do mesmo objeto feito 
+                                    if(checkInterest(first_interest, arg1, neigh_aux->this->fd) != 1)
                                     {
-				        first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
-				    }
-				    // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
+                                        first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
+                                    }
+                                    // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
                                     tab_aux = first_entry;
                                     while(tab_aux != NULL)
                                     {
                                         if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                                         {
                                             writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
-					    flag_no_dest = 0;
+                                            flag_no_dest = 0;
                                         }
                                         tab_aux = tab_aux->next;
                                     }
-				    if(flag_no_dest == 1)
-				    {
-				        errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
+                                    if(flag_no_dest == 1)
+                                    {
+                                        errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
                                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                         {
                                             fprintf(stderr, "error in NODATA TCP message creation\n");
                                             exit(-1);
                                         }
                                         writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
-				        deleteInterest(&first_interest, arg1, neigh_aux->this->fd);
-				    }
-				}
-		            }
-			    free(id);
+                                        deleteInterest(&first_interest, arg1, neigh_aux->this->fd);
+                                    }
+                                }
+                            }
+                            free(id);
                         }
 
                         // para quando recebemos uma mensagem DATA do vizinho interno, iteramos a lista de pedidos
                         if (!strcmp(command, "DATA") && word_count == 2)
                         {
-			    interest_aux = first_interest;
-			    interest_tmp = NULL;
-			    we_used_interest_tmp = 0;
-			    while(interest_aux != NULL)
-			    {
-				// se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
-			        if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
-			        {
-			            interest_tmp = interest_aux->next;
-				    we_used_interest_tmp = 1;
-			            // verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
-				    if(checkCache(cache, arg1, n_obj) == 0)
-				    {
-			                n_obj++;
-                                        n_obj = saveinCache(cache, arg1, n_obj);
-				    }
-				    deleteInterest(&first_interest, arg1, interest_aux->fd);
-			        }
-				// se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
-			        else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
-		                {
-				    interest_tmp = interest_aux->next;
-				    we_used_interest_tmp = 1;
-			            // verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
-				    if(checkCache(cache, arg1, n_obj) == 0)
-				    {
-			                n_obj++;
-                                        n_obj = saveinCache(cache, arg1, n_obj);
-				    }
-			            // reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
-				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
-				    deleteInterest(&first_interest, arg1, interest_aux->fd);
-			        }
-		                if (we_used_interest_tmp)
+                            interest_aux = first_interest;
+                            interest_tmp = NULL;
+                            we_used_interest_tmp = 0;
+                            while(interest_aux != NULL)
+                            {
+                                // se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
+                                if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
+                                {
+                                    interest_tmp = interest_aux->next;
+                                    we_used_interest_tmp = 1;
+                                    // verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
+                                    if(checkCache(cache, arg1, n_obj) == 0)
+                                    {
+                                        n_obj++;
+                                        n_obj = saveinCache(cache, arg1, n_obj, N);
+                                    }
+                                    deleteInterest(&first_interest, arg1, interest_aux->fd);
+                                }
+                                // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
+                                else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
+                                {
+                                    interest_tmp = interest_aux->next;
+                                    we_used_interest_tmp = 1;
+                                    // verificamos se o objeto poderia já estar na cache, se não tiver armazenamos
+                                    if(checkCache(cache, arg1, n_obj) == 0)
+                                    {
+                                        n_obj++;
+                                        n_obj = saveinCache(cache, arg1, n_obj, N);
+                                    }
+                                    // reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
+                                    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+                                    deleteInterest(&first_interest, arg1, interest_aux->fd);
+                                }
+                                if (we_used_interest_tmp)
                                 {
                                     interest_aux = interest_tmp;
                                     interest_tmp = NULL;
@@ -1040,34 +871,34 @@ int main(int argc, char *argv[])
                                 }
                                 else
                                     interest_aux = interest_aux->next;
-			    }   
+                            }   
                         }
 
                         // para quando recebemos uma mensagem NODATA do vizinho interno, iteramos a lista de pedidos
                         if (!strcmp(command, "NODATA") && word_count == 2)
                         {
-			    interest_aux = first_interest;
-			    interest_tmp = NULL;
-			    we_used_interest_tmp = 0;
-			    while(interest_aux != NULL)
-			    {
-				// se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
-			        if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
-			        {
-			            interest_tmp = interest_aux->next;
-				    we_used_interest_tmp = 1;
-				    deleteInterest(&first_interest, arg1, interest_aux->fd);
-			        }
-				// se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
-			        else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
-		                {
-				    interest_tmp = interest_aux->next;
-				    we_used_interest_tmp = 1;
-				    // reencaminhamos a mensagem NODATA para o vizinho que fez esse pedido
-				    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
-				    deleteInterest(&first_interest, arg1, interest_aux->fd);
-			        }
-		                if (we_used_interest_tmp)
+                            interest_aux = first_interest;
+                            interest_tmp = NULL;
+                            we_used_interest_tmp = 0;
+                            while(interest_aux != NULL)
+                            {
+                                // se verificarmos que um pedido para esse objeto tinha fd = -1 quer dizer que somos a origem do pedido
+                                if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd == SELFFD)
+                                {
+                                    interest_tmp = interest_aux->next;
+                                    we_used_interest_tmp = 1;
+                                    deleteInterest(&first_interest, arg1, interest_aux->fd);
+                                }
+                                // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
+                                else if(!strcmp(interest_aux->obj, arg1) && interest_aux->fd != SELFFD)
+                                {
+                                    interest_tmp = interest_aux->next;
+                                    we_used_interest_tmp = 1;
+                                    // reencaminhamos a mensagem NODATA para o vizinho que fez esse pedido
+                                    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+                                    deleteInterest(&first_interest, arg1, interest_aux->fd);
+                                }
+                                if (we_used_interest_tmp)
                                 {
                                     interest_aux = interest_tmp;
                                     interest_tmp = NULL;
@@ -1075,7 +906,7 @@ int main(int argc, char *argv[])
                                 }
                                 else
                                     interest_aux = interest_aux->next;
-			    }
+                            }
                         }
 
                         msg_aux = msg_list;
@@ -1119,7 +950,7 @@ int main(int argc, char *argv[])
                             }
                             writeTCP(external->fd, strlen(message_buffer), message_buffer);
                             n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
-			    deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
+                            deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
                         }
                         if (we_used_tab_tmp)
                         {
@@ -1130,19 +961,19 @@ int main(int argc, char *argv[])
                         else
                             tab_aux = tab_aux->next;
                     }
-			
-		    interest_aux = first_interest;
-		    interest_tmp = NULL;
-		    we_used_interest_tmp = 0;
-		    while(interest_aux != NULL)
-		    {
-	 	        if(interest_aux->fd == neigh_aux->this->fd)
-			{
-			    interest_tmp = interest_aux->next;
-			    we_used_interest_tmp = 1;
-			    deleteInterestfd(&first_interest, interest_aux->fd);
-			}
-			if (we_used_interest_tmp)
+
+                    interest_aux = first_interest;
+                    interest_tmp = NULL;
+                    we_used_interest_tmp = 0;
+                    while(interest_aux != NULL)
+                    {
+                        if(interest_aux->fd == neigh_aux->this->fd)
+                        {
+                            interest_tmp = interest_aux->next;
+                            we_used_interest_tmp = 1;
+                            deleteInterestfd(&first_interest, interest_aux->fd);
+                        }
+                        if (we_used_interest_tmp)
                         {
                             interest_aux = interest_tmp;
                             interest_tmp = NULL;
@@ -1150,7 +981,7 @@ int main(int argc, char *argv[])
                         }
                         else
                             interest_aux = interest_aux->next;
-		    }
+                    }
 
                     close(neigh_aux->this->fd); // fechar o fd do tipo que fez close do outro lado
                     printf("O nosso vizinho interno abandonou\n");
@@ -1241,20 +1072,19 @@ int main(int argc, char *argv[])
                     {
                         // ao receber a lista, vai selecionar um nó qualquer e ligar-se a ele
                         // de momento, liga-se ao último nó da lista enviada, que (da maneira que a lista é preenchida)
-                        // é o primeiro nó da nodes_fucking_list
-                        num_nodes = 0;
+                        // é o primeiro nó da list_of_nodes
                         // aqui, é preciso escrever código para limpar 
                         // a memória da lista anterior, caso ela exista
                         // na verdade, o correto será apagar a lista
                         // imediatamente após a confirmação de que entrámos no servidor
                         // e portanto não precisamos mais dela
-                        nodes_fucking_list = NULL;
-                        parseNodeListRecursive(list_msg, &num_nodes, &nodes_fucking_list);
+                        list_of_nodes = NULL;
+                        parseNodeListRecursive(list_msg, &list_of_nodes);
                         // printf("%d\n",num_nodes);
                         external = safeMalloc(sizeof(viz));
                         external->next_av_ix = 0;
                         safeTCPSocket(&(external->fd));
-                        connectTCP(nodes_fucking_list->IP, nodes_fucking_list->port, external->fd, 
+                        connectTCP(list_of_nodes->IP, list_of_nodes->port, external->fd, 
                                 "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
 
                         //waiting_for_backup = 1; // we're outnumbered, need backup
@@ -1271,8 +1101,8 @@ int main(int argc, char *argv[])
                         // aqui devíamos colocar um estado novo em que ficamos à espera do extern
 
                         // acabar de preencher a informação do external
-                        strncpy(external->IP, nodes_fucking_list->IP, NI_MAXHOST);
-                        strncpy(external->port, nodes_fucking_list->port, NI_MAXSERV);
+                        strncpy(external->IP, list_of_nodes->IP, NI_MAXHOST);
+                        strncpy(external->port, list_of_nodes->port, NI_MAXSERV);
 
                         external_is_filled = 1;
 
@@ -1311,22 +1141,22 @@ int main(int argc, char *argv[])
             user_input = readCommand(&instr_code);
             if (instr_code == JOIN_ID && network_state == NONODES)
             {
-		memset(net, 0, 64);
-		memset(ident, 0, 64);
-		self.net = NULL;
-		self.id = NULL;
-		    
+                memset(net, 0, 64);
+                memset(ident, 0, 64);
+                self.net = NULL;
+                self.id = NULL;
+
                 if(sscanf(user_input,"%s %s", net, ident) != 2)
                 {
                     printf("Error in sscanf JOIN_ID\n");
                     exit(1);
                 }
-                
+
                 self.net = safeMalloc(strlen(net)+1);
                 strcpy(self.net, net);
                 self.id = safeMalloc(strlen(ident)+1);
                 strcpy(self.id, ident);
-		    
+
                 strncpy(self.IP, argv[1], NI_MAXHOST);
                 strncpy(self.port, argv[2], NI_MAXSERV);
 
@@ -1343,10 +1173,10 @@ int main(int argc, char *argv[])
             }
             else if (instr_code == JOIN_LINK && network_state == NONODES)
             {
-		memset(net, 0, 64);
-		memset(ident, 0, 64);
-		self.net = NULL;
-		self.id = NULL;
+                memset(net, 0, 64);
+                memset(ident, 0, 64);
+                self.net = NULL;
+                self.id = NULL;
                 // esta condição em princípio nunca será necessária
                 // visto que quando iniciamos o programa o external é colocado a NULL
                 // e quando fazemos LEAVE também. Portanto temos sempre de alocar memória
@@ -1358,12 +1188,12 @@ int main(int argc, char *argv[])
                     printf("Error in sscanf JOIN_LINK\n");
                     exit(1);
                 }
-		 
-		self.net = safeMalloc(strlen(net)+1);
+
+                self.net = safeMalloc(strlen(net)+1);
                 strcpy(self.net, net);
                 self.id = safeMalloc(strlen(ident)+1);
                 strcpy(self.id, ident);
-		    
+
                 strncpy(self.IP, argv[1], NI_MAXHOST);
                 strncpy(self.port, argv[2], NI_MAXSERV);
 
@@ -1441,13 +1271,13 @@ int main(int argc, char *argv[])
                     free(neigh_aux);
                     neigh_aux = NULL;
                 }
-		    
+
                 free(self.net);
-		free(self.id);
+                free(self.id);
                 FreeTabExp(&first_entry);
                 FreeObjectList(&head);
                 FreeCache(cache,n_obj);
-		FreeInterestList(&first_interest);
+                FreeInterestList(&first_interest);
                 n_obj = 0;
                 // indicar que não estamos ligados a qualquer rede
                 network_state = NONODES;
@@ -1455,24 +1285,24 @@ int main(int argc, char *argv[])
             else if (instr_code == CREATE && network_state != NONODES)
             {
                 for(i=0; i<strlen(user_input); i++)
-	        {
-		    if(user_input[i] == ' ' || user_input[i] == '\n')
-		    user_input[i] = '\0';	
-		}
+                {
+                    if(user_input[i] == ' ' || user_input[i] == '\n')
+                        user_input[i] = '\0';	
+                }
                 head = createinsertObject(head,user_input,self.id);
                 printObjectList(head);
             }
             else if (instr_code == GET && network_state != NONODES)
             {
                 for(i=0; i<strlen(user_input); i++)
-	        {
-		    if(user_input[i] == ' ' || user_input[i] == '\n')
-		    user_input[i] = '\0';	
-		}
-                
-		id = NULL;
-		id = getidfromName(user_input, id);    
-		    
+                {
+                    if(user_input[i] == ' ' || user_input[i] == '\n')
+                        user_input[i] = '\0';	
+                }
+
+                id = NULL;
+                id = getidfromName(user_input, id);    
+
                 if(checkCache(cache, user_input, n_obj) == 1)
                 {
                     printf("Object %s found in our own cache!\n", user_input);
@@ -1504,8 +1334,8 @@ int main(int argc, char *argv[])
                                     exit(-1);
                                 }
                                 writeTCP(tab_aux->fd_sock, strlen(message_buffer), message_buffer);
-				if(checkInterest(first_interest, user_input, SELFFD) != 1)
-				first_interest = addInterest(first_interest, user_input, SELFFD);
+                                if(checkInterest(first_interest, user_input, SELFFD) != 1)
+                                    first_interest = addInterest(first_interest, user_input, SELFFD);
                             }
                             tab_aux = tab_aux->next;
                         }
@@ -1515,23 +1345,23 @@ int main(int argc, char *argv[])
                         printf("Node with the identifier %s does not exist in the network %s!\n", id, self.net);
                     }
                 }
-		free(id);
+                free(id);
             }
             else if(instr_code == EXIT)
                 exit(0);
             else if(instr_code == ST)
             {
                 if (network_state == NONODES)
-		{
-		    printf("State is NONODES\n");
+                {
+                    printf("State is NONODES\n");
                     printf("We're not connected to any network\n");
-		}
-		else if (network_state == ONENODE)
-		{
-		    printf("State is ONENODE\n");
+                }
+                else if (network_state == ONENODE)
+                {
+                    printf("State is ONENODE\n");
                     printf("We're alone in network %s!\n", self.net);         
-		}
-		else if (network_state == MANYNODES)
+                }
+                else if (network_state == MANYNODES)
                 {
                     printf("State is MANYNODES\n");
                     neigh_aux = int_neighbours;
@@ -1552,7 +1382,7 @@ int main(int argc, char *argv[])
             }
             else if(instr_code == SC && network_state != NONODES)
             {
-                printCache(cache,n_obj);		
+                printCache(cache,n_obj, N);		
             }
             else if(network_state == NONODES && (instr_code == SR || instr_code == SC || instr_code == GET || instr_code == CREATE || instr_code == LEAVE))
             {
@@ -1568,557 +1398,3 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-list_interest *addInterest(list_interest *first_interest, char *obj, int fd)
-{
-    list_interest *tmp = first_interest;
-    list_interest *new_interest = safeMalloc(sizeof(list_interest));
-    
-    new_interest->obj = safeMalloc(strlen(obj)+1);
-    strcpy(new_interest->obj, obj);
-    new_interest->fd = fd;
-
-    if(first_interest == NULL)
-    {
-        first_interest = new_interest;
-        new_interest->next = NULL;
-    }
-    else
-    {
-        while(tmp->next != NULL)
-        {
-            tmp = tmp->next;
-        }
-        tmp->next = new_interest;
-        new_interest->next = NULL;
-    }
-
-    return first_interest;
-}
-
-void deleteInterest(list_interest **first_interest, char *obj, int fd)
-{
-    list_interest *tmp;
-
-    if(!strcmp((*first_interest)->obj, obj) && (*first_interest)->fd == fd)
-    {
-        tmp = *first_interest; 
-        *first_interest = (*first_interest)->next;
-        free(tmp->obj);
-        free(tmp);
-    }
-    else
-    {
-        list_interest *curr = *first_interest;
-
-        while(curr->next != NULL)
-        {
-            if(!strcmp(curr->next->obj, obj) && curr->next->fd == fd)
-            {
-                tmp = curr->next;
-                curr->next = curr->next->next;
-                free(tmp->obj);
-                free(tmp);
-                break;
-            }
-            else
-                curr = curr->next;
-        }
-    }
-}
-
-void deleteInterestfd(list_interest **first_interest, int fd)
-{
-    list_interest *tmp;
-
-    if((*first_interest)->fd == fd)
-    {
-        tmp = *first_interest; 
-        *first_interest = (*first_interest)->next;
-        free(tmp->obj);
-        free(tmp);
-    }
-    else
-    {
-        list_interest *curr = *first_interest;
-
-        while(curr->next != NULL)
-        {
-            if(curr->next->fd == fd)
-            {
-                tmp = curr->next;
-                curr->next = curr->next->next;
-                free(tmp->obj);
-                free(tmp);
-                break;
-            }
-            else
-                curr = curr->next;
-        }
-    }
-}
-
-int checkInterest(list_interest *first_interest, char *obj, int fd)
-{
-    list_interest *aux = first_interest;
-
-    while(aux != NULL)
-    {
-	// se ja houver um pedido igual do mesmo vizinho
-        if(!strcmp(aux->obj, obj) && aux->fd == fd)
-        {
-            return 1;
-        }
-        aux = aux->next;
-    }
-    // se não houver pedido igual
-    return 0;
-}
-
-void FreeInterestList(list_interest **first_interest)
-{
-    list_interest *curr = *first_interest;
-    list_interest *next;
-
-    while(curr != NULL)
-    {
-        next = curr->next;
-	free(curr->obj);
-        free(curr);
-        curr = next;
-    }
-
-    *first_interest = NULL;
-}
-
-char *getidfromName(char *user_input, char *id)
-{
-	int i, len = 0;
-        for(i=0; i<strlen(user_input); i++)
-        {
-	    if(i>0)
-	    {
-	        if(user_input[i] == '.')
-		{
-		    len = i;
-		    break;
-	        }
-	    }
-        }
-	
-        id = safeMalloc(len+1);
-        for(i=0; i<len; i++)
-        {
-	    id[i] = user_input[i];
-        }
-        id[len] = '\0';
-	
-        return id;
-}
-
-
-tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd)
-{
-    tab_entry *tmp = first_entry;
-    tab_entry *new_entry = safeMalloc(sizeof(tab_entry));
-
-    new_entry->id_dest = safeMalloc(strlen(id_dst)+1);
-    strcpy(new_entry->id_dest, id_dst);
-    new_entry->fd_sock = fd;
-
-    if(first_entry == NULL)
-    {
-        first_entry = new_entry;
-        new_entry->next = NULL;
-    }
-    else
-    {
-        while(tmp->next != NULL)
-        {
-            tmp = tmp->next;
-        }
-        tmp->next = new_entry;
-        new_entry->next = NULL;
-    }
-
-    return first_entry;
-}
-
-void deleteTabEntryid(tab_entry **first_entry, char *id_out)
-{
-    tab_entry *tmp;
-
-    if(!strcmp((*first_entry)->id_dest, id_out))
-    {
-        tmp = *first_entry; 
-        *first_entry = (*first_entry)->next;
-	free(tmp->id_dest);
-        free(tmp);
-    }
-    else
-    {
-        tab_entry *curr = *first_entry;
-
-        while(curr->next != NULL)
-        {
-            if(!strcmp(curr->next->id_dest, id_out))
-            {
-                tmp = curr->next;
-                curr->next = curr->next->next;
-		free(tmp->id_dest);
-                free(tmp);
-                break;
-            }
-            else
-                curr = curr->next;
-        }
-    }
-}
-
-void deleteTabEntryfd(tab_entry **first_entry, int fd_out)
-{
-    tab_entry *tmp;
-
-    if((*first_entry)->fd_sock == fd_out)
-    {
-        tmp = *first_entry; 
-        *first_entry = (*first_entry)->next;
-	free(tmp->id_dest);
-        free(tmp);
-    }
-    else
-    {
-        tab_entry *curr = *first_entry;
-
-        while(curr->next != NULL)
-        {
-            if(curr->next->fd_sock == fd_out)
-            {
-                tmp = curr->next;
-                curr->next = curr->next->next;
-		free(tmp->id_dest);
-                free(tmp);
-                break;
-            }
-            else
-                curr = curr->next;
-        }
-    }
-}
-
-void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int fd)
-{
-    tab_entry *aux = first_entry;
-
-    while(aux != NULL)
-    {
-        errcode = snprintf(buffer, 150, "ADVERTISE %s\n", aux->id_dest);  
-        if (buffer == NULL || errcode < 0 || errcode >= 150)
-        {
-            fprintf(stderr, "error in ADVERTISE TCP message creation\n");
-            exit(-1);  
-        }
-        writeTCP(fd, strlen(buffer), buffer);
-        aux = aux->next;
-    }
-}
-
-int checkTabEntry(tab_entry *first_entry, char *id)
-{
-    tab_entry *aux = first_entry;
-
-    while(aux != NULL)
-    {
-        if(!strcmp(aux->id_dest, id))
-        {
-            return 1;
-        }
-        aux = aux->next;
-    }
-    return 0;
-}
-
-void printTabExp(tab_entry *first_entry)
-{
-    tab_entry *aux = first_entry;
-    printf("Routing Table:\n");
-    while(aux != NULL)
-    {
-        printf("%s, %d\n",aux->id_dest,aux->fd_sock);
-        aux = aux->next;
-    }
-}
-
-void FreeTabExp(tab_entry **first_entry)
-{
-    tab_entry *curr = *first_entry;
-    tab_entry *next;
-
-    while(curr != NULL)
-    {
-        next = curr->next;
-	free(curr->id_dest);
-        free(curr);
-        curr = next;
-    }
-
-    *first_entry = NULL;
-}
-
-char *getConcatString( const char *str1, const char *str2 ) 
-{
-    char *finalString = NULL;
-    size_t n = 0;
-
-    if ( str1 ) n += strlen( str1 );
-    if ( str2 ) n += strlen( str2 );
-
-    if ( ( str1 || str2 ) && ( finalString = malloc( n + 1 ) ) != NULL )
-    {
-        *finalString = '\0';
-
-        if ( str1 ) strcpy( finalString, str1 );
-        if ( str2 ) strcat( finalString, str2 );
-    }
-
-    return finalString;
-}
-
-int checkObjectList(list_objects *head_obj, char *name)
-{
-    list_objects *aux = head_obj;
-    
-    while(aux != NULL)
-    {
-        if(!strcmp(aux->objct, name))
-        {
-            return 1;
-        }
-        aux = aux->next;
-    }
-    return 0;
-}
-
-list_objects *createinsertObject(list_objects *head, char *subname, char *id)
-{
-    int errcode;
-    char *str;
-    char str_id[150];
-
-    memset(str_id, 0, 150);
-
-    errcode = snprintf(str_id, 150, "%s.", id);
-    if (str_id == NULL || errcode < 0 || errcode >= 150)
-    {
-        fprintf(stderr, "error in in filling string str_id\n");
-        exit(-1);
-    }
-
-    str = getConcatString(str_id, subname);
-
-    if(checkObjectList(head,str) == 1)
-    {
-        printf("Object %s already exists in our own list of objects!\n", str);
-    }
-    else
-    {
-	list_objects *tmp = head;
-        list_objects *new_obj = safeMalloc(sizeof(list_objects));
-        new_obj->objct = safeMalloc(strlen(str)+1);
-        // INSEGURO
-        strcpy(new_obj->objct, str);
-
-        if(head == NULL)
-        {
-            head = new_obj;
-            new_obj->next = NULL;
-        }
-        else
-        {
-            while(tmp->next != NULL)
-            {
-                tmp = tmp->next;
-            }
-            tmp->next = new_obj;
-            new_obj->next = NULL;
-        } 
-    }
-    free(str);
-    return head;
-}
-
-void printObjectList(list_objects *head_obj)
-{
-    list_objects *aux = head_obj;
-    printf("List of objects:\n");
-    while(aux != NULL)
-    {
-        printf("%s\n",aux->objct);
-        aux = aux->next;
-    }
-}
-
-void FreeObjectList(list_objects **head_obj)
-{
-    list_objects *curr = *head_obj;
-    list_objects *next;
-
-    while(curr != NULL)
-    {
-        next = curr->next;
-        free(curr->objct);
-        free(curr);
-        curr = next;
-    }
-
-    *head_obj = NULL;
-}
-
-int checkCache(cache_objects cache[N], char *name, int n_obj)
-{
-    int i;
-
-    for(i=0; i<n_obj; i++)
-    {
-        if(strcmp(cache[i].obj, name) == 0)
-        {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-int saveinCache(cache_objects cache[N], char *name, int n_obj)
-{
-    int i;
-	
-    if(n_obj > N)
-    {
-        for(i=0; i<N-1; i++)
-	{
-            free(cache[i].obj);	
-            cache[i].obj = NULL;
-	    cache[i].obj = safeMalloc(strlen(cache[i+1].obj)+1);
-            strcpy(cache[i].obj, cache[i+1].obj);
-        }
-	free(cache[i].obj);
-   	n_obj--;	
-    }
-
-    cache[n_obj-1].obj = NULL;
-    cache[n_obj-1].obj = safeMalloc(strlen(name)+1);
-    strcpy(cache[n_obj-1].obj, name);
-	
-    return n_obj;
-}
-
-void printCache(cache_objects cache[N], int n_obj)
-{
-    int i;
-    printf("Cache (Size:%d)\nNº objects stored: %d\n", N, n_obj);
-    for(i=0; i<n_obj; i++)
-    {
-        printf("%s\n",cache[i].obj);
-    }
-}
-
-void FreeCache(cache_objects cache[N], int n_obj)
-{
-    int i;
-	
-    for(i=0; i<n_obj; i++)
-    {
-        free(cache[i].obj);
-	cache[i].obj = NULL;
-    }
-}
-
-int deleteCacheid(cache_objects cache[N], int n_obj, char *id)
-{
-    int i;
-    char *ident;
-    int num = n_obj;
-    cache_aux *head_c = NULL, *aux;
-	
-    for(i=0; i<n_obj; i++)
-    {
-        ident = NULL;
-        ident = getidfromName(cache[i].obj, ident);
-        
-        if(!strcmp(ident, id))
-        {   
-            free(cache[i].obj);
-            cache[i].obj = NULL;
-            num--;
-        }
-        else
-        {
-            head_c = createinsertCacheAux(head_c, cache[i].obj);
-            free(cache[i].obj);
-            cache[i].obj = NULL; 
-        }
-        free(ident);
-    }
-
-    i = 0;
-    aux = head_c;
-    while(aux != NULL)
-    {
-        cache[i].obj = safeMalloc(strlen(aux->obj)+1);
-        strcpy(cache[i].obj, aux->obj);
-        aux = aux->next;
-        i++;
-    }
-    FreeCacheAuxList(&head_c);
-
-    return num;
-}
-
-cache_aux *createinsertCacheAux(cache_aux *head_c, char *objct)
-{
-    cache_aux *tmp = head_c;
-    cache_aux *new = safeMalloc(sizeof(cache_aux));
-
-    new->obj = safeMalloc(strlen(objct)+1);
-    strcpy(new->obj, objct);
-
-    if(head_c == NULL)
-    {
-        head_c = new;
-        new->next = NULL;
-    }
-    else
-    {
-        while(tmp->next != NULL)
-        {
-            tmp = tmp->next;
-        }
-        tmp->next = new;
-        new->next = NULL;
-    }
-
-    return head_c;
-}
-
-void FreeCacheAuxList(cache_aux **head_c)
-{
-    cache_aux *curr = *head_c;
-    cache_aux *next;
-
-    while(curr != NULL)
-    {
-        next = curr->next;
-        free(curr->obj);
-        free(curr);
-        curr = next;
-    }
-
-    *head_c = NULL;
-}
-
-void addToList(internals **int_neighbours, viz *new)
-{
-    internals *aux = *int_neighbours;
-    *int_neighbours = safeMalloc(sizeof(internals));
-    (*int_neighbours)->this = new;
-    (*int_neighbours)->next = aux;
-}
