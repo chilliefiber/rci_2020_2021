@@ -361,6 +361,7 @@ int main(int argc, char *argv[])
                             neigh_aux = neigh_aux->next;
                         }
                         deleteTabEntryid(&first_entry, arg1);
+                        deleteInterestWITHDRAW(first_interest, arg1);
                         n_obj = deleteCacheid(cache, n_obj, arg1);
                     }
 
@@ -416,9 +417,7 @@ int main(int argc, char *argv[])
                                 flag_no_dest = 1;
                                 // verifica se ja houve outro pedido do mesmo objeto feito
                                 if(checkInterest(first_interest, arg1, external->fd) != 1)
-                                {
                                     first_interest = addInterest(first_interest, arg1, external->fd);
-                                }
                                 // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
                                 tab_aux = first_entry;
                                 while(tab_aux != NULL)
@@ -431,16 +430,7 @@ int main(int argc, char *argv[])
                                     tab_aux = tab_aux->next;
                                 }
                                 if(flag_no_dest == 1)
-                                {
-                                    errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
-                                    if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-                                    {
-                                        fprintf(stderr, "error in NODATA TCP message creation\n");
-                                        exit(-1);
-                                    }
-                                    writeTCP(external->fd, strlen(message_buffer), message_buffer);
                                     deleteInterest(&first_interest, arg1, external->fd);
-                                }
                             }
                         }
                         free(id);
@@ -558,6 +548,7 @@ int main(int argc, char *argv[])
                             writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                             neigh_aux = neigh_aux->next;
                         }
+                        deleteInterestWITHDRAW(first_interest, tab_aux->id_dest);
                         n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
                         deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
                     }
@@ -744,6 +735,7 @@ int main(int argc, char *argv[])
                             }
                             writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
                             deleteTabEntryid(&first_entry, arg1);
+                            deleteInterestWITHDRAW(first_interest, arg1);
                             n_obj = deleteCacheid(cache, n_obj, arg1);
                         }
 
@@ -798,9 +790,7 @@ int main(int argc, char *argv[])
                                     flag_no_dest = 1;
                                     // verifica se ja houve outro pedido do mesmo objeto feito 
                                     if(checkInterest(first_interest, arg1, neigh_aux->this->fd) != 1)
-                                    {
                                         first_interest = addInterest(first_interest, arg1, neigh_aux->this->fd);
-                                    }
                                     // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
                                     tab_aux = first_entry;
                                     while(tab_aux != NULL)
@@ -813,16 +803,7 @@ int main(int argc, char *argv[])
                                         tab_aux = tab_aux->next;
                                     }
                                     if(flag_no_dest == 1)
-                                    {
-                                        errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
-                                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-                                        {
-                                            fprintf(stderr, "error in NODATA TCP message creation\n");
-                                            exit(-1);
-                                        }
-                                        writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
                                         deleteInterest(&first_interest, arg1, neigh_aux->this->fd);
-                                    }
                                 }
                             }
                             free(id);
@@ -950,6 +931,7 @@ int main(int argc, char *argv[])
                                 neigh_tmp2 = neigh_tmp2->next;
                             }
                             writeTCP(external->fd, strlen(message_buffer), message_buffer);
+                            deleteInterestWITHDRAW(first_interest, tab_aux->id_dest);
                             n_obj = deleteCacheid(cache, n_obj, tab_aux->id_dest);
                             deleteTabEntryfd(&first_entry, tab_aux->fd_sock);
                         }
