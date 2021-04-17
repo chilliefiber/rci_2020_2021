@@ -103,8 +103,8 @@ void deleteInterestWITHDRAW(list_interest *first_interest, char *id)
     
     while(interest_aux != NULL)
     {
-	    ident = NULL;
-	    ident = getidfromName(interest_aux->obj, ident);
+        ident = NULL;
+	ident = getidfromName(interest_aux->obj, ident);
         
         if(!strcmp(ident, id))
         {
@@ -121,6 +121,7 @@ void deleteInterestWITHDRAW(list_interest *first_interest, char *id)
         }
         else
             interest_aux = interest_aux->next;
+        free(ident);
     }
 }
 
@@ -181,8 +182,6 @@ char *getidfromName(char *user_input, char *id)
 
     return id;
 }
-
-
 
 char *getConcatString( const char *str1, const char *str2 ) 
 {
