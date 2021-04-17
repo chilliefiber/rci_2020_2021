@@ -133,8 +133,8 @@ int main(int argc, char *argv[])
     messages *msg_list, *msg_aux;
     no self;
     list_objects *head = NULL;
-    int i, flag_no_dest;
-    char net[64], ident[64];
+    int flag_no_dest;
+    char net[64], ident[64], name[64], subname[64];
     char *id =  NULL;
 
     struct sigaction act;
@@ -1275,28 +1275,29 @@ int main(int argc, char *argv[])
             }
             else if (instr_code == CREATE && network_state != NONODES)
             {
-                for(i=0; i<strlen(user_input); i++)
+                memset(subname, 0, 64);
+			    if(sscanf(user_input,"%s", subname) != 1)
                 {
-                    if(user_input[i] == ' ' || user_input[i] == '\n')
-                        user_input[i] = '\0';	
+                    printf("Error in sscanf CREATE\n");
+                    exit(1);
                 }
-                head = createinsertObject(head,user_input,self.id);
+                head = createinsertObject(head,subname,self.id);
                 printObjectList(head);
             }
             else if (instr_code == GET && network_state != NONODES)
             {
-                for(i=0; i<strlen(user_input); i++)
+                memset(name, 0, 64);
+			    if(sscanf(user_input,"%s", name) != 1)
                 {
-                    if(user_input[i] == ' ' || user_input[i] == '\n')
-                        user_input[i] = '\0';	
+                    printf("Error in sscanf GET\n");
+                    exit(1);
                 }
-
                 id = NULL;
-                id = getidfromName(user_input, id);    
+                id = getidfromName(name, id);    
 
-                if(checkCache(cache, user_input, n_obj) == 1)
+                if(checkCache(cache, name, n_obj) == 1)
                 {
-                    printf("Object %s found in our own cache!\n", user_input);
+                    printf("Object %s found in our own cache!\n", name);
                 }
                 else
                 {
@@ -1307,26 +1308,26 @@ int main(int argc, char *argv[])
                         {
                             if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock == SELFFD)
                             {
-                                if(checkObjectList(head, user_input) == 1)
+                                if(checkObjectList(head, name) == 1)
                                 {
-                                    printf("Object %s found in our own list of objects!\n", user_input);
+                                    printf("Object %s found in our own list of objects!\n", name);
                                 }
                                 else
                                 {
-                                    printf("Object %s not found in our own list of objects!\n", user_input);
+                                    printf("Object %s not found in our own list of objects!\n", name);
                                 }
                             }
                             if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                             {
-                                errcode = snprintf(message_buffer, 150, "INTEREST %s\n", user_input);  
+                                errcode = snprintf(message_buffer, 150, "INTEREST %s\n", name);  
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                 {
                                     fprintf(stderr, "error in INTEREST TCP message creation\n");
                                     exit(-1);
                                 }
                                 writeTCP(tab_aux->fd_sock, strlen(message_buffer), message_buffer);
-                                if(checkInterest(first_interest, user_input, SELFFD) != 1)
-                                    first_interest = addInterest(first_interest, user_input, SELFFD);
+                                if(checkInterest(first_interest, name, SELFFD) != 1)
+                                    first_interest = addInterest(first_interest, name, SELFFD);
                             }
                             tab_aux = tab_aux->next;
                         }
