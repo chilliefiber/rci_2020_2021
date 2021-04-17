@@ -29,6 +29,7 @@ typedef struct internals{
 }internals;
 
 void addToList(internals **int_neighbours, viz *new);
-void clearViz(viz **v);
-void clearIntNeighbours(internals **int_neighbours);
+void freeViz(viz **v);
+void freeIntNeighbours(internals **int_neighbours);
+void freeSelf(no *self);
 #endif

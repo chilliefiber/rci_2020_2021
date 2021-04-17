@@ -8,7 +8,7 @@
 #include "tcp.h"
 #include "errcheck.h"
 #include <stdio.h> // depois tirar este
-char writeTCP(int fd, ssize_t nleft, char *buffer)
+int writeTCP(int fd, ssize_t nleft, char *buffer)
 {
     fputs( "We're writing shit through TCP mudafucka\n",stdout);
     ssize_t nwritten;
@@ -16,11 +16,11 @@ char writeTCP(int fd, ssize_t nleft, char *buffer)
     while(nleft>0){
         nwritten = write(fd, buffer, nleft);
         if (nwritten <= 0)
-            return 0;
+            return ERROR;
         nleft -= nwritten;
         buffer += nwritten;
     }
-    return 1;
+    return NO_ERROR;
 }
 
 

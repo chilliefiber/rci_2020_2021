@@ -21,7 +21,7 @@ typedef struct messages{
  * \param buffer texto que é para ser enviado
  * \return 1 caso envio seja bem sucedido, 0 caso contrário
  */
-char writeTCP(int fd, ssize_t nleft, char *buffer); 
+int writeTCP(int fd, ssize_t nleft, char *buffer); 
 
 /**
  * messagesAlloc faz a alocação da estrutura messages

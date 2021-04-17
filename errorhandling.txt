@@ -1,4 +1,4 @@
-Erros de tudo o que não seja redes (malloc, calloc, memset) fechar programa
+Erros de tudo o que não seja redes (malloc, calloc, memset, snprintf) fechar programa
 
 Erro no close
 -Optámos por não fechar o programa, devemos mudar? Os erros no close parecem situações crípticas que não percebemos se indicam obrigatoriamente que o sistema está mal
@@ -7,10 +7,10 @@ Erro na alocação de um socket
 Fechar programa
 
 Erro de JOIN_LINK
--Falha na conexão com o nó selecionado => notificar erro, devolver programa ao utilizador (para poder fazer outras coisas)
+-Falha na conexão/comunicação com o nó selecionado => notificar erro, devolver programa ao utilizador (para poder fazer outras coisas)
 
 Erro de JOIN_ID
--Falha na conexão com o nó => iterar pela NODESLIST, tentar todos os nós até algum dar. Caso falhem todos, notificar erro, devolver programa ao utilizador (para poder fazer outras coisas)
+-Falha na conexão/comunicação com o nó => iterar pela NODESLIST, tentar todos os nós até algum dar. Caso falhem todos, notificar erro, devolver programa ao utilizador (para poder fazer outras coisas)
 
 Mensagem mal formatada vinda do servidor de nós
 -Sair da rede
@@ -26,3 +26,6 @@ COMUNICAÇÃO UDP
 2 - Timer no select: 5 segundos para receber o Unreg e a NODESLIST
 3 - Caso NODESLIST se não recebermos abandonamos a rede
 4 - Caso unreg se não recebermos reenviamos 2 vezes e depois se à terceira não recebermos nada assumimos que funcionou
+* - Falha prolongada na comunicação => abandonar rede
+Na falha na comunicação não fechamos o socket do nosso client UDP, visto que o podemos utilizar com vários servidores na mesma execução do programa. No entanto saímos da rede.
+Uma falha na comunicação pode ser um timeout de um sendto bem sucedido, um sendto falhado, uma mensagem mal formatada, um recvfrom mal sucedido

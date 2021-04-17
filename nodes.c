@@ -1,3 +1,8 @@
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 #include "nodes.h"
 #include "errcheck.h"
 
@@ -20,7 +25,7 @@ void freeViz(viz **v)
     }
 }
 
-void clearIntNeighbours(internals **int_neighbours)
+void freeIntNeighbours(internals **int_neighbours)
 {
     internals *neigh_aux;
     while (*int_neighbours)
@@ -34,4 +39,11 @@ void clearIntNeighbours(internals **int_neighbours)
         neigh_aux = NULL;
     }
     *int_neighbours = NULL;
+}
+
+
+void freeSelf(no *self)
+{
+    free(self->id);
+    free(self->net);
 }
