@@ -341,7 +341,7 @@ void printCache(char **cache, int n_obj, int N)
     }
 }
 
-void FreeCache(char **cache, int n_obj)
+void clearCache(char **cache, int n_obj)
 {
     int i;
 
@@ -435,3 +435,16 @@ void FreeCacheAuxList(cache_aux **head_c)
     *head_c = NULL;
 }
 
+char **createCache(int N)
+{
+    char **createCache = safeMalloc(N * sizeof(char*));
+    for (int i=0; i < N; i++)
+        createCache[i] = NULL;
+    return createCache;
+}
+
+void freeCache(char **cache, int N)
+{
+    clearCache(cache, N);
+    free(cache);
+}

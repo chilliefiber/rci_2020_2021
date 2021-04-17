@@ -84,7 +84,7 @@ int checkCache(char **cache, char *name, int n_obj);
  * \param name: ponteiro para a string correspondente ao nome do objeto a verificar
  * \param n_obj: inteiro correspondente ao número de objetos presentes na cache
  * \param N: capacidade da cache
- * \retorna 1 se existir o objeto na cache e retorna 0 caso não exista
+ * \return n_obj atualizado
  */
 int saveinCache(char **cache, char *name, int n_obj, int N);
 
@@ -95,11 +95,11 @@ int saveinCache(char **cache, char *name, int n_obj, int N);
  */
 void printCache(char **cache, int n_obj, int N);
 
-/** FreeCache: função que liberta a cache (desaloca a memória alocada nas várias posições da cache correpondente as strings dos objetos)
+/** clearCache: função que liberta a cache (desaloca a memória alocada nas várias posições da cache correpondente as strings dos objetos)
  * \param cache: variável do tipo cache_objects corrrespondente à estrutura que guarda informação dos objetos em slots na cache
  * \param n_obj: inteiro correspondente ao número de objetos presentes na cache
  */
-void FreeCache(char **cache, int n_obj);
+void clearCache(char **cache, int n_obj);
 
 int deleteCacheid(char **cache, int n_obj, char *id);
 
@@ -107,4 +107,16 @@ cache_aux *createinsertCacheAux(cache_aux *head_c, char *objct);
 
 void FreeCacheAuxList(cache_aux **head_c);
 
+
+/** createCache: cria uma cache de N char* e coloca-os todos a NULL
+ * \param N: capacidade da cache
+ * \return cache criada
+ */
+char **createCache(int N);
+
+/** freeCache: Liberta a memória de todos os elementos da cache, e dos ponteiros para os elementos da cache
+ * \param cache: ponteiro para o primeiro elemento da cache
+ * \param N: capacidade da cache
+ */
+void freeCache(char **cache, int N);
 #endif

@@ -52,15 +52,16 @@ void sendUDP(int fd, char* ip, char* port, char* text, char* addrinfo_error_msg,
     freeaddrinfo(res);
 }
 
-void safeGetAddrInfo(char* ip, char* port, struct addrinfo *hints, struct addrinfo **res, char* error_msg)
+int safeGetAddrInfo(char* ip, char* port, struct addrinfo *hints, struct addrinfo **res, char* error_msg)
 {
-    size_t n;
-    n = getaddrinfo(ip, port, hints, res);
-    if (n != 0){
+    int errcode;
+    errcode = getaddrinfo(ip, port, hints, res);
+    if (errcode != 0){
         fputs(error_msg, stderr);
-        fprintf(stderr, "error: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "error: %s\n", gai_error(errcode));
+        return ERROR;
     }
+    return NO_ERROR;
 }
 
 // aqui perguntar ao prof se devemos usar os tipos de argumentos do recvfrom!!!
@@ -94,21 +95,33 @@ void safeTCPSocket(int* fd)
 }
 
 
-void connectTCP(char *ip, char* port, int fd, char *addrinfo_error_msg, char *connect_error_msg)
+int connectTCP(char *ip, char* port, int fd, char *addrinfo_error_msg, char *connect_error_msg)
 {
-  struct addrinfo hints, *res;
-  size_t n;
-  memset(&hints, 0, sizeof hints);
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-  safeGetAddrInfo(ip, port, &hints, &res, addrinfo_error_msg);
-  n = connect(fd, res->ai_addr, res->ai_addrlen);
-  if (n == -1){
-    fputs(connect_error_msg, stderr);
-    fprintf(stderr, "error: %s\n", strerror(errno));
+    struct addrinfo hints, *res;
+    size_t n;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    if (safeGetAddrInfo(ip, port, &hints, &res, addrinfo_error_msg)==ERROR)
+        return ERROR;
+    n = connect(fd, res->ai_addr, res->ai_addrlen);
+    if (n == -1){
+        fputs(connect_error_msg, stderr);
+        fprintf(stderr, "error: %s\n", strerror(errno));
+        freeaddrinfo(res);
+        return ERROR;
+    }
     freeaddrinfo(res);
-    exit(EXIT_FAILURE);
-  }
-  freeaddrinfo(res);
-  //return 1;
+    return NO_ERROR;
+}
+
+void safeExit(char **cache, viz **external, viz **backup, viz **new, tab_entry **first_entry, list_objects **head, list_interest **first_interest)
+{
+    freeCache(cache);
+    clearViz(external);
+    clearViz(backup);
+    clearViz(new);
+    FreeTabExp(first_entry);
+    FreeObjectList(head);
+    FreeInterestList(first_interest);
 }

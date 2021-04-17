@@ -101,10 +101,10 @@ int main(int argc, char *argv[])
     // MANYNODES no caso em que a rede tem mais que dois nós
     enum {NONODES, ONENODE, MANYNODES} network_state;
     network_state = NONODES;
-    node_list *list_of_nodes;
+    node_list *list_of_nodes, *aux_list_of_nodes;
     fd_set rfds;
     int fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0;
-    int external_is_filled, we_used_tab_tmp, we_used_interest_tmp;
+    int external_is_filled, we_used_tab_tmp, we_used_interest_tmp, connection_successful;
     enum instr instr_code;
     char *user_input, flag, tcp_read_flag;
     char command[150], arg1[150], arg2[150];
@@ -123,7 +123,8 @@ int main(int argc, char *argv[])
 
     tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
     list_interest *first_interest = NULL, *interest_aux, *interest_tmp;
-    char **cache = safeMalloc(N*sizeof(char*));
+    char **cache = createCache(N);
+
     int n_obj = 0;
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
@@ -140,9 +141,17 @@ int main(int argc, char *argv[])
     // Protection against SIGPIPE signals 
     memset(&act, 0, sizeof act);
     act.sa_handler = SIG_IGN;
-    if(sigaction(SIGPIPE, &act, NULL) == -1) exit(1);
+    if(sigaction(SIGPIPE, &act, NULL) == -1)
+    {
+        fprintf(stderr, "Error in SIGPIPE: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 
-    if ((fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) == -1) exit(1);
+    if ((fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+    {
+        fprintf(stderr, "Error getting socket for UDP client: %s\n", strerror(errno));
+        exit(1);
+    }
     safeTCPSocket(&tcp_server_fd);
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -173,6 +182,7 @@ int main(int argc, char *argv[])
         // se o processo não está em nenhuma rede, não é suposto contactarem nos por TCP
         FD_SET(tcp_server_fd, &rfds); 
         max_fd = max(max_fd, tcp_server_fd);
+        
         if (external)
         {
             FD_SET(external->fd, &rfds);
@@ -187,11 +197,10 @@ int main(int argc, char *argv[])
         }
         // select upon which file descriptor to act 
         counter = select(max_fd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
-        if(counter<=0)  exit(1);
+        if(counter<=0) ; exit(1);
         // TCP
         if (FD_ISSET(tcp_server_fd, &rfds))
         {
-            printf("New connection mudafucka\n");
             new = safeMalloc(sizeof(viz));
             new->next_av_ix = 0;
             addrlen = sizeof(addr);
@@ -207,10 +216,8 @@ int main(int argc, char *argv[])
             // porque não estamos ligados a qualquer rede
             if (network_state == NONODES)
             {
-                printf("Não estamos em nenhuma rede\n");
-                close(new->fd);
-                free(new);
-                new = NULL;
+                printf("We're not currently in a new network, but we received a connection through TCP. We closed it immediately.\n");
+                clearViz(&new);
             }
             // se este processo estava em modo ONENODE, o primeiro tipo que nos contactar
             // será o nosso vizinho externo
@@ -220,7 +227,6 @@ int main(int argc, char *argv[])
             {
                 external = new;
                 new = NULL;
-                printf("Estamos sozinhos numa rede\n");
                 network_state = MANYNODES;
                 external_is_filled = 0;
                 // notar que apesar de estarmos em twonodes, não temos o external preenchido
@@ -1065,13 +1071,12 @@ int main(int argc, char *argv[])
                         parseNodeListRecursive(list_msg, &list_of_nodes);
                         external = safeMalloc(sizeof(viz));
                         external->next_av_ix = 0;
-                        safeTCPSocket(&(external->fd));
-                        connectTCP(list_of_nodes->IP, list_of_nodes->port, external->fd, 
-                                "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
-
-                        //waiting_for_backup = 1; // we're outnumbered, need backup
-                        network_state = MANYNODES; // pelo menos até recebermos a informação do backup, não sabemos se não há apenas 2 nodes
-                        // quer dizer, podemos ver pelo num_nodes na verdade
+                        external->fd = socket(AF_INET, SOCK_STREAM, 0);
+                        if (external->fd == -1){
+                            fputs("Error making a TCP socket for external neighbour after receiving nodes list!\n", stderr);
+                            fprintf(stderr, "error: %s\n", strerror(errno));
+                            safeExit();
+                        }
                         // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
                         errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self.IP, self.port);  
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
@@ -1079,7 +1084,44 @@ int main(int argc, char *argv[])
                             fprintf(stderr, "error in NEW TCP message creation\n");
                             exit(-1);
                         }
-                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
+                        errcode = ERROR;
+                        aux_list_of_nodes = list_of_nodes;
+                        while (aux_list_of_nodes)
+                        {
+                            errcode = connectTCP(aux_list_of_nodes->IP, aux_list_of_nodes->port, external->fd, 
+                                "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
+                            // caso nos consigamos ligar, tentamos enviar as 2 mensagens por TCP que temos de enviar
+                            // se alguma delas falhar no envio, consideramos que não nos conseguimos ligar e tentamo-nos ligar ao seguinte
+                            if (errcode == NO_ERROR)
+                            {
+                               if (writeTCP(external->fd, strlen(message_buffer), message_buffer))
+                               {
+                                   errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n",self.id);  
+                                   if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                                   {
+                                       fprintf(stderr, "error in ADVERTISE TCP message creation\n");
+                                       errcode = ERROR;
+                                   }
+                                   else
+                                       errcode = NO_ERROR;
+                                   if (!writeTCP(external->fd, strlen(message_buffer), message_buffer))
+                                       errcode = ERROR;
+                               }
+                               else
+                                   errcode = ERROR;
+                            }
+                            // neste caso o errcode será NO_ERROR se tanto o connect como ambos os writes funcionaram
+                            if (errcode == NO_ERROR)
+                                break;
+                            aux_list_of_nodes = aux_list_of_nodes->next;
+                        }
+                        // neste caso não nos conseguimos ligar à rede
+                        // temos de sair da rede, adicionar aqui esse código
+                        if (errcode == ERROR)
+                        
+                        
+                        //waiting_for_backup = 1; // we're outnumbered, need backup
+                        network_state = MANYNODES;                     
                         // aqui devíamos colocar um estado novo em que ficamos à espera do extern
 
                         // acabar de preencher a informação do external
@@ -1088,14 +1130,6 @@ int main(int argc, char *argv[])
 
                         external_is_filled = 1;
 
-                        errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n",self.id);  
-                        if (message_buffer == NULL || errcode < 0 || errcode >= 150)
-                        {
-                            fprintf(stderr, "error in ADVERTISE TCP message creation\n");
-                            exit(-1);
-                        }
-
-                        writeTCP(external->fd, strlen(message_buffer), message_buffer);
                     }
                     // neste caso a rede está vazia. O nó coloca-se no estado single_node e regista-se diretamente
                     // no servidor de nós
@@ -1225,40 +1259,15 @@ int main(int argc, char *argv[])
                 // terminar a sessão TCP com o vizinho externo
                 // esta condição é importante para o caso em que fazemos leave e estávamos sozinhos
                 // numa rede
-                if (external)
-                {
-                    errcode = close(external->fd);
-                    if (errcode)
-                    {
-                        fprintf(stderr, "error closing file descriptor of external neighbour: %s\n", strerror(errno));
-                        exit(EXIT_FAILURE);
-                    }
-                    // deixar a variável external pronta para um possível JOIN vindouro
-                    free(external);
-                    external = NULL;
-                }
+                clearViz(&external);
                 // terminar todas as conexões com vizinhos internos
                 // e limpar a memória da lista
-                while (int_neighbours)
-                {
-                    neigh_aux = int_neighbours;
-                    int_neighbours = int_neighbours->next;
-                    errcode = close(neigh_aux->this->fd);
-                    if (errcode)
-                    {
-                        fprintf(stderr, "error closing file descriptor of internal neighbour: %s\n", strerror(errno));
-                        exit(EXIT_FAILURE);
-                    }
-                    free(neigh_aux->this);
-                    free(neigh_aux);
-                    neigh_aux = NULL;
-                }
-
+                clearIntNeighbours(&int_neighbours);
                 free(self.net);
                 free(self.id);
                 FreeTabExp(&first_entry);
                 FreeObjectList(&head);
-                FreeCache(cache,n_obj);
+                clearCache(cache,n_obj);
                 FreeInterestList(&first_interest);
                 n_obj = 0;
                 // indicar que não estamos ligados a qualquer rede

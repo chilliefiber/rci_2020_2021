@@ -1,5 +1,11 @@
 Erros de tudo o que não seja redes (malloc, calloc, memset) fechar programa
 
+Erro no close
+-Optámos por não fechar o programa, devemos mudar? Os erros no close parecem situações crípticas que não percebemos se indicam obrigatoriamente que o sistema está mal
+
+Erro na alocação de um socket
+Fechar programa
+
 Erro de JOIN_LINK
 -Falha na conexão com o nó selecionado => notificar erro, devolver programa ao utilizador (para poder fazer outras coisas)
 

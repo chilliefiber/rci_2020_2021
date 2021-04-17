@@ -26,10 +26,10 @@ char writeTCP(int fd, ssize_t nleft, char *buffer)
 
 messages* messagesAlloc(void)
 {
-  messages* new = malloc(sizeof(messages));
+  messages* new = safeMalloc(sizeof(messages));
   if (!new)
       return NULL;
-  new->message = calloc(N_MAX+1, sizeof(char));
+  new->message = safeCalloc(N_MAX+1, sizeof(char));
   if (!new->message)
       return NULL;
   new->next = NULL;

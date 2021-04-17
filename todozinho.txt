@@ -1,0 +1,4 @@
+Ir ao codigo do waiting_for_list terminar a saida da rede quando nao deu para ligar a nenhum
+Por o codigo a compilar
+Testar com um servidor de nos no netcat
+Ler o main todo
