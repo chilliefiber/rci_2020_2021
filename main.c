@@ -1290,7 +1290,7 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
     if (!strcmp(self->IP, backup->IP) && !strcmp(self->port, backup->port))
     {
         printf("Fomos abandonados pelo nosso externo e éramos o nosso backup\n");
-        free(external);
+        free(*external);
         // neste caso vamos promover um dos vizinhos internos a vizinho externo
         // o vizinho que vai ser promovido vai ser o do topo da lista
         if (*int_neighbours)
@@ -1323,7 +1323,7 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
         {
             printf("Não tínhamos vizinhos internos\n");
             network_state = ONENODE;
-            external = NULL;
+            *external = NULL;
         }
     }
 
