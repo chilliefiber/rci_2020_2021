@@ -158,14 +158,14 @@ void FreeInterestList(list_interest **first_interest)
     *first_interest = NULL;
 }
 
-char *getidfromName(char *user_input, char *id)
+char *getidfromName(char *name, char *id)
 {
     int i, len = 0;
-    for(i=0; i<strlen(user_input); i++)
+    for(i=0; i<strlen(name); i++)
     {
         if(i>0)
         {
-            if(user_input[i] == '.')
+            if(name[i] == '.')
             {
                 len = i;
                 break;
@@ -176,7 +176,7 @@ char *getidfromName(char *user_input, char *id)
     id = safeMalloc(len+1);
     for(i=0; i<len; i++)
     {
-        id[i] = user_input[i];
+        id[i] = name[i];
     }
     id[len] = '\0';
 
