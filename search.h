@@ -34,10 +34,10 @@ void FreeInterestList(list_interest **first_interest);
 
 /**
  * getidfromName: função que extrai do nome introduzido pelo comando "get" o ientificador do nó destino para a pesquisa do objeto
- * \param user_input: ponteiro para a string correspondente ao nome introduzido pelo comando "get"
+ * \param name: ponteiro para a string correspondente ao nome introduzido pelo comando "get"
  * \param id: ponteiro para a string correspondente ao identificador do nó que será retornado no final desta função
  */
-char *getidfromName(char *user_input, char *id);
+char *getidfromName(char *name, char *id);
 
 
 /** getConcatString: função que concatena duas strings numa só e retorna no final o ponteiro para string resultante (utilizada na criação de objetos para juntar id ao subnome)
