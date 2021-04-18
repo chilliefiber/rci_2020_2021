@@ -436,8 +436,9 @@ void FreeCacheAuxList(cache_aux **head_c)
 
 char **createCache(int N)
 {
+    int i;
     char **createCache = safeMalloc(N * sizeof(char*));
-    for (int i=0; i < N; i++)
+    for (i=0; i < N; i++)
         createCache[i] = NULL;
     return createCache;
 }
