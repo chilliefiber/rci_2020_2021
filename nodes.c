@@ -46,4 +46,6 @@ void freeSelf(no *self)
 {
     free(self->id);
     free(self->net);
+    self->id = NULL; 
+    self->net = NULL;
 }
