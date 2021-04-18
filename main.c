@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     network_state = NONODES;
     node_list *list_of_nodes, *aux_list_of_nodes;
     fd_set rfds;
-    int fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0;
+    int fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0, we_register_as_single_node;
     int external_is_filled, we_used_tab_tmp, we_used_interest_tmp, connection_successful;
     enum instr instr_code;
     char *user_input, flag, tcp_read_flag;
@@ -131,8 +131,7 @@ int main(int argc, char *argv[])
 
     tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
     list_interest *first_interest = NULL, *interest_aux, *interest_tmp;
-    char **cache = createCache(N);
-
+    char **cache = createCache(N); 
     int n_obj = 0;
     // estados associados ao select
     enum {not_waiting, waiting_for_list, waiting_for_regok, waiting_for_unregok} udp_state;
@@ -140,6 +139,7 @@ int main(int argc, char *argv[])
     // lista de mensagens recebidas num readTCP
     messages *msg_list, *msg_aux;
     no self;
+    self.id = NULL; self.net = NULL;
     list_objects *head = NULL;
     int flag_no_dest;
     char net[64], ident[64], name[64], subname[64];
@@ -169,8 +169,10 @@ int main(int argc, char *argv[])
     if (bind(tcp_server_fd, res->ai_addr, res->ai_addrlen) == -1)
     {
         fprintf(stderr, "Error binding TCP server: %s\n", strerror(errno));
+        freeaddrinfo(res);
         exit(EXIT_FAILURE);
     }
+    freeaddrinfo(res);
     if (listen(tcp_server_fd, 5) == -1)
     {
         fprintf(stderr, "Error putting TCP server to listen: %s\n", strerror(errno));
@@ -821,6 +823,7 @@ int main(int argc, char *argv[])
             }
             else if (udp_state == waiting_for_list)
             { 
+                we_register_as_single_node = 1;
                 // fazer função que verifica se temos uma lista de nós
                 list_msg = isNodesList(dgram, self.net, &flag);
                 // neste caso não recebemos
@@ -892,31 +895,35 @@ int main(int argc, char *argv[])
                                 fprintf(stderr, "Error closing file descriptor for unavailable external neighbour: %s\n", strerror(errno));
                             aux_list_of_nodes = aux_list_of_nodes->next;
                         }
-                        // neste caso não nos conseguimos ligar à rede
-                        // temos de sair da rede, adicionar aqui esse código
+                        // neste caso não nos conseguimos ligar a nenhum dos nós listados no servidor de nomes
+                        // vamos entrar na rede como nó único, assumindo que os outros falharam de algum modo
+                        // ou estão no processo
+                        // de enviar o UNREG
                         if (errcode == ERROR)
                         {
-                            freeViz(&external);
-                            freeSelf(&self); 
-                        } 
-                        
-                        //waiting_for_backup = 1; // we're outnumbered, need backup
-                        network_state = MANYNODES;                     
-                        // aqui devíamos colocar um estado novo em que ficamos à espera do extern
+                            free(external);
+                            external = NULL;
+                            network_state = ONENODE; 
+                        }  
+	                // caso em que nos conseguimos ligar a um dos nós listados no servidor de nomes
+                        else
+			{
+                            //waiting_for_backup = 1; // we're outnumbered, need backup
+                            network_state = MANYNODES;                     
+                            // aqui devíamos colocar um estado novo em que ficamos à espera do extern
 
-                        // acabar de preencher a informação do external
-                        strncpy(external->IP, list_of_nodes->IP, NI_MAXHOST);
-                        strncpy(external->port, list_of_nodes->port, NI_MAXSERV);
-
-                        external_is_filled = 1;
-
+                            // acabar de preencher a informação do external
+                            strncpy(external->IP, list_of_nodes->IP, NI_MAXHOST);
+                            strncpy(external->port, list_of_nodes->port, NI_MAXSERV);
+                            external_is_filled = 1;
+                            we_register_as_single_node = 0;
+			}
                         // clear list
                         freeNodeList(&list_of_nodes);
-
                     }
-                    // neste caso a rede está vazia. O nó coloca-se no estado single_node e regista-se diretamente
+                    // neste caso a rede está vazia ou não nos conseguimos ligar a nenhum dos listados. O nó coloca-se no estado ONENODE regista-se diretamente
                     // no servidor de nós
-                    else
+                    if (we_register_as_single_node)
                     {
                         network_state = ONENODE; // to rule them all
                         // criar string para enviar o registo do nó
@@ -1078,8 +1085,7 @@ int main(int argc, char *argv[])
                 // terminar todas as conexões com vizinhos internos
                 // e limpar a memória da lista
                 freeIntNeighbours(&int_neighbours);
-                free(self.net);
-                free(self.id);
+                freeSelf(&self);
                 FreeTabExp(&first_entry);
                 FreeObjectList(&head);
                 clearCache(cache,n_obj);
@@ -1091,7 +1097,7 @@ int main(int argc, char *argv[])
             else if (instr_code == CREATE && network_state != NONODES)
             {
                 memset(subname, 0, 64);
-			    if(sscanf(user_input,"%s", subname) != 1)
+                if(sscanf(user_input,"%s", subname) != 1)
                 {
                     printf("Error in sscanf CREATE\n");
                     safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
@@ -1102,7 +1108,7 @@ int main(int argc, char *argv[])
             else if (instr_code == GET && network_state != NONODES)
             {
                 memset(name, 0, 64);
-			    if(sscanf(user_input,"%s", name) != 1)
+                if(sscanf(user_input,"%s", name) != 1)
                 {
                     printf("Error in sscanf GET\n");
                     safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
@@ -1155,7 +1161,7 @@ int main(int argc, char *argv[])
                 free(id);
             }
             else if(instr_code == EXIT)
-                exit(0);
+                safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
             else if(instr_code == ST)
             {
                 if (network_state == NONODES)
@@ -1212,12 +1218,14 @@ void safeExit(char **cache, int N, viz **external, viz **backup, viz **new,
 {
     freeCache(cache, N);
     freeViz(external);
-    freeViz(backup);
+    free(*backup);
+    *backup = NULL;
     freeViz(new);
     FreeTabExp(first_entry);
     FreeObjectList(head);
     FreeInterestList(first_interest);
     freeSelf(self);
+    exit(1);
 }
 
 void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **external,
