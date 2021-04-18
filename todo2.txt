@@ -1,0 +1,2 @@
+perguntar ao sanguino a questão de como testar as diferentes falhas no write
+terminar os writes error no external

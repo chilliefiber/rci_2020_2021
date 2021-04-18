@@ -15,6 +15,9 @@ Erro de JOIN_ID
 Mensagem mal formatada vinda do servidor de nós
 -Sair da rede
 
+Servidor de nomes tem dados errados, mas bem formatados
+-Prosseguir o programa como se tudo estivesse bem, assumindo que alguém corrijirá os dados errados no servidor
+
 Erro de sscanf com EOF
 -sscanf em geral é mau e evitável mas diz para usar. Mesmo que dê EOF, ele pode não settar o errno de acordo com a manpage e com https://wiki.sei.cmu.edu/confluence/display/c/INT05-C.+Do+not+use+input+functions+to+convert+character+data+if+they+cannot+handle+all+possible+inputs No entanto, caso o errno não esteja settado o strerror(errno) diz Sucess
 
@@ -22,10 +25,11 @@ Erro na criação da socket TCP para o serviro
 -crashar programa
 
 COMUNICAÇÃO UDP
-1- Adicionar timer no select! 3 tentativas para o envio e depois abandonar rede
+1- Adicionar timer no select! 3 tentativas para o envio e depois notificar o utilizador
 2 - Timer no select: 5 segundos para receber o Unreg e a NODESLIST
-3 - Caso NODESLIST se não recebermos abandonamos a rede
+3 - Caso NODESLIST se não recebermos abandonamos a rede (JOIN_ID e não recebemos nada/há falha no send ou recv)
 4 - Caso unreg se não recebermos reenviamos 2 vezes e depois se à terceira não recebermos nada assumimos que funcionou
-* - Falha prolongada na comunicação => abandonar rede
-Na falha na comunicação não fechamos o socket do nosso client UDP, visto que o podemos utilizar com vários servidores na mesma execução do programa. No entanto saímos da rede.
+* - Falha prolongada na comunicação => ignorar os erros
+Na falha na comunicação não fechamos o socket do nosso client UDP, visto que o podemos utilizar com vários servidores na mesma execução do programa. Só saímos da rede se estávamos em JOIN_ID na fase de pedir a lista
 Uma falha na comunicação pode ser um timeout de um sendto bem sucedido, um sendto falhado, uma mensagem mal formatada, um recvfrom mal sucedido
+Optamos por não sair da rede caso o servidor falhe e já lá estamos dentro. Assim, emulamos a situação de que ficamos sem servidor central e ligamo nos manualmente com JOIN_LINK

@@ -1,5 +1,4 @@
-Ir ao codigo do waiting_for_list terminar a saida da rede quando nao deu para ligar a nenhum no JOIN_ID. Fazer também no stdin JOIN_LINK
-Por o codigo a compilar
+Ir ao codigo do waiting_for_list terminar a saida da rede quando nao deu para ligar a nenhum no JOIN_ID. Fazer também no stdin JOIN_LINK (sim)
 Testar com um servidor de nos no netcat
 Ler o main todo
 
