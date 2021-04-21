@@ -5,7 +5,6 @@
 
 #include "routing.h"
 #include "errcheck.h"
-#include "tcp.h"
 
 tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd)
 {
@@ -93,23 +92,6 @@ void deleteTabEntryfd(tab_entry **first_entry, int fd_out)
             else
                 curr = curr->next;
         }
-    }
-}
-
-void writeAdvtoEntryNode(tab_entry *first_entry, int errcode, char *buffer, int fd)
-{
-    tab_entry *aux = first_entry;
-
-    while(aux != NULL)
-    {
-        errcode = snprintf(buffer, 150, "ADVERTISE %s\n", aux->id_dest);  
-        if (buffer == NULL || errcode < 0 || errcode >= 150)
-        {
-            fprintf(stderr, "error in ADVERTISE TCP message creation\n");
-            exit(-1);  
-        }
-        writeTCP(fd, strlen(buffer), buffer);
-        aux = aux->next;
     }
 }
 

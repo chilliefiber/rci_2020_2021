@@ -1,6 +1,17 @@
+
+Reescrever todo o código UDP, utilizando timers bloqueantes
+
+Seguir os passos da descrição que dei no mail ao sanguino sobre a comunicação UDP
+
 Ir ao codigo do waiting_for_list terminar a saida da rede quando nao deu para ligar a nenhum no JOIN_ID. Fazer também no stdin JOIN_LINK (sim)
 Testar com um servidor de nos no netcat
-Ler o main todo
 
-Fazer 2 funçoes uma para o external e outra para um internal, que chamamos quando o fd da message closed ou erro no write
-Para o write advertise devolver uma lista dos vetores que falharam e chamar funçao que dá crash de um fd
+Adicionar a escolha de um elemento aleatorio da lista
+
+Adicionar o JOIN SERVDOWN
+
+Adicionar as verificações de todos os valores de saida do read
+
+Adicionar a mudança para malloc
+
+Reler tudo

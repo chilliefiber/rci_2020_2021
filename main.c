@@ -34,6 +34,7 @@ void internalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
 void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **external,
         viz *backup,  
         internals **int_neighbours, list_interest **first_interest, no *self);
+        
 int main(int argc, char *argv[])
 {
     int errcode, N;
@@ -99,7 +100,7 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);   
         }
     }
-
+    
     if(argc == 5 || argc == 3) 
         N = 2;
 
@@ -108,11 +109,12 @@ int main(int argc, char *argv[])
         regIP = "193.136.138.142";
         regUDP = "59000";
     }
+    
     network_state = NONODES;
     node_list *list_of_nodes, *aux_list_of_nodes;
     fd_set rfds;
     int fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0, we_register_as_single_node;
-    int external_is_filled, we_used_tab_tmp, we_used_interest_tmp, connection_successful;
+    int external_is_filled, we_used_interest_tmp;
     enum instr instr_code;
     char *user_input, flag, tcp_read_flag;
     char command[150], arg1[150], arg2[150];
@@ -127,9 +129,9 @@ int main(int argc, char *argv[])
     // mas ainda não recebemos a mensagem de contacto
     viz *external=NULL, *new=NULL, *backup=safeMalloc(sizeof(viz));
     // lista de vizinhos internos
-    internals *int_neighbours = NULL, *neigh_aux, *neigh_tmp, *neigh_tmp2;
+    internals *int_neighbours = NULL, *neigh_aux, *neigh_tmp, *neigh_tmp1, *neigh_tmp2;
 
-    tab_entry *first_entry = NULL, *tab_aux, *tab_tmp;
+    tab_entry *first_entry = NULL, *tab_aux;
     list_interest *first_interest = NULL, *interest_aux, *interest_tmp;
     char **cache = createCache(N); 
     int n_obj = 0;
@@ -141,7 +143,7 @@ int main(int argc, char *argv[])
     no self;
     self.id = NULL; self.net = NULL;
     list_objects *head = NULL;
-    int flag_no_dest;
+    int flag_no_dest, flag_one_node = 0;
     char net[64], ident[64], name[64], subname[64];
     char *id =  NULL;
 
@@ -152,35 +154,35 @@ int main(int argc, char *argv[])
     if(sigaction(SIGPIPE, &act, NULL) == -1)
     {
         fprintf(stderr, "Error in SIGPIPE: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
     }
 
     if ((fd_udp = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
     {
         fprintf(stderr, "Error getting socket for UDP client: %s\n", strerror(errno));
-        exit(1);
+        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
     }
     safeTCPSocket(&tcp_server_fd);
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
+    
     safeGetAddrInfo(NULL, TCP, &hints, &res, "Error getting address info for TCP server socket\n");
     if (bind(tcp_server_fd, res->ai_addr, res->ai_addrlen) == -1)
     {
         fprintf(stderr, "Error binding TCP server: %s\n", strerror(errno));
         freeaddrinfo(res);
-        exit(EXIT_FAILURE);
+        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
     }
     freeaddrinfo(res);
     if (listen(tcp_server_fd, 5) == -1)
     {
         fprintf(stderr, "Error putting TCP server to listen: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
     }
     helpMenu();
-    // este while precisa do for interno para lidar com vários fds set ao mesmo tempo
-    // ver slide do guia 
+
     while(1)
     {
         // initialize file descriptor set
@@ -189,6 +191,7 @@ int main(int argc, char *argv[])
         FD_SET(fd_udp, &rfds);
         FD_SET(STDIN_FILENO, &rfds);
         max_fd=max(STDIN_FILENO, fd_udp);
+        
         // se o processo não está em nenhuma rede, não é suposto contactarem nos por TCP
         FD_SET(tcp_server_fd, &rfds); 
         max_fd = max(max_fd, tcp_server_fd);
@@ -208,6 +211,7 @@ int main(int argc, char *argv[])
         // select upon which file descriptor to act 
         counter = select(max_fd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         if(counter<=0) exit(1);
+        
         // TCP
         if (FD_ISSET(tcp_server_fd, &rfds))
         {
@@ -220,13 +224,29 @@ int main(int argc, char *argv[])
                 exit(EXIT_FAILURE);
             }
 
-            writeAdvtoEntryNode(first_entry, errcode, message_buffer, new->fd);
+			tab_aux = first_entry;
+            while(tab_aux)
+            {
+                errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n", tab_aux->id_dest);  
+                if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                {
+                    fprintf(stderr, "error in ADVERTISE TCP message creation\n");
+                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);  
+                }
+                if(writeTCP(new->fd, strlen(message_buffer), message_buffer) == ERROR)
+                {
+				    freeViz(&new);
+                    fprintf(stderr, "error sending ADVERTISE TCP message to new node in network\n");
+                    break;
+				}
+				tab_aux = tab_aux->next;
+            }
 
             // se este processo estava em modo NONODES, ninguém nos deve contactar por TCP
             // porque não estamos ligados a qualquer rede
             if (network_state == NONODES)
             {
-                printf("We're not currently in a new network, but we received a connection through TCP. We closed it immediately.\n");
+                fprintf(stderr, "We're not currently in a new network, but we received a connection through TCP. We closed it immediately.\n");
                 freeViz(&new);
             }
             // se este processo estava em modo ONENODE, o primeiro tipo que nos contactar
@@ -235,16 +255,18 @@ int main(int argc, char *argv[])
             // Ficamos à espera que ele nos envie o NEW para lhe devolvermos o EXTERN
             else if (network_state == ONENODE)
             {
+				printf("We are currently alone in a network. Someone has connected, let's make them our new external neighbour\n");
                 external = new;
                 new = NULL;
                 network_state = MANYNODES;
                 external_is_filled = 0;
+                flag_one_node = 1;
             } 
             // se este processo estava em modo MANYNODES, alguém que nos contacta
             // será mais um vizinho interno
             else if (network_state == MANYNODES)
             {
-                printf("Estamos numa rede com 2 ou mais nós. Alguém se ligou, vamos torná-lo um vizinho interno\n");
+                printf("We are currently in a network with 2 or more nodes. Someone has connected, let's make them our new internal neighbour\n");
                 // isto é para o caso que está diretamente acima nos comentários, em que não temos os dados do external preenchidos
                 // depois enviamos o EXTERN para este interno quando FD_ISSET(external->fd) e recebermos o NEW
                 if (external_is_filled)
@@ -253,19 +275,19 @@ int main(int argc, char *argv[])
                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                     {
                         fprintf(stderr, "error in EXTERN TCP message creation when we get a new internal neighbour\n");
-                        exit(-1);
+                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                     }
                     if (writeTCP(new->fd, strlen(message_buffer), message_buffer) == ERROR) 
                     {
                         freeViz(&new);
                         fprintf(stderr, "error sending EXTERN TCP message when we get a new internal neighbour\n");
                     }
-                    else
-                    {
-                        addToList(&int_neighbours, new);
-                        new = NULL; 
-                    }
                 }
+                if(new != NULL)
+                {
+                   addToList(&int_neighbours, new);
+                   new = NULL;
+                } 
             }
             // não é suposto acontecer alguma vez estas 2 condições
             // isto está aqui apenas por motivos de debug, caso haja alguma falha na máquina de estados
@@ -309,18 +331,16 @@ int main(int argc, char *argv[])
                             if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                             {
                                 fprintf(stderr, "error in REG UDP message creation\n");
-                                exit(-1);
+                                safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                             }
                             if (sendUDP(fd_udp, regIP, regUDP, message_buffer, "Error getting address information for UDP server socket\n", "error in REG UDP message send\n") == ERROR)
                             {
                                 
                             }
                             udp_state = waiting_for_regok;
-                            printf("Acabámos de enviar o REG UDP\n");
                         }
                         we_are_reg = 1;
                         // deviamos colocar aqui a verificação se somos o nosso próprio backup ou nao, isto é two nodes vs many nodes
-
                     }
                     // este é o caso em que recebemos connect, mas 
                     // estávamos sozinhos na rede, então o nosso vizinho externo foi
@@ -337,7 +357,7 @@ int main(int argc, char *argv[])
                         if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                         {
                             fprintf(stderr, "error in EXTERN TCP message creation when there are only two nodes\n");
-                            exit(-1);
+                            safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                         }
                         // se o write falhar, fechamos a conexão imediatamente
                         // limpamos a memória de todas as mensagens recebidas do externo
@@ -346,7 +366,7 @@ int main(int argc, char *argv[])
                         // a vir nas próximas mensagens
                         if (writeTCP(external->fd, strlen(message_buffer), message_buffer) == ERROR)
                         {
-                            fprintf(stderr, "Error writing to external->fd when we receive NEW from it. We shall close the connection now\n");
+                            fprintf(stderr, "Error writing to external neighbour when we receive NEW from it. We shall close the connection now\n");
                             externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);
                             while (msg_list != NULL)
                             {
@@ -362,64 +382,111 @@ int main(int argc, char *argv[])
                         // nesta situação, o nosso backup vamos ser nós próprios
                         strncpy(backup->IP, IP, NI_MAXHOST); 
                         strncpy(backup->port, TCP, NI_MAXSERV);
-
+                        
                         // enviar para todos os internos os dados do nosso vizinho externo
                         // isto porque caso estivéssemos sozinhos na rede e de repente se ligaram 
                         // vários gajos a nós por connect, podemos ter ficado numa situação em que
                         // aceitámos connect, estávamos MANYNODES mas não tínhamos o nosso vizinho externo preenchido
                         // com o seu IP e porto. Nesse caso, ao recebermos este NEW temos de notificar todos os internos
+                        neigh_tmp = NULL;
                         neigh_aux = int_neighbours;
                         while (neigh_aux)
                         {
                             if (writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
                             {
-                                fprintf(stderr, "Error writing to internal neighbour when we receive NEW from our external neighbour");
+                                fprintf(stderr, "Error writing to internal neighbour when we receive NEW from our external. We shall close the connection now\n");
                                 internalLeft(&first_entry, &n_obj, cache, &external,
                                              backup, &neigh_aux, &neigh_tmp,
                                              &int_neighbours, &first_interest, &self);
                             }
+                            neigh_tmp = neigh_aux;
                             neigh_aux = neigh_aux->next;
                         }
-
                     }
 
                     // para quando recebemos uma mensagem ADVERTISE do vizinho externo, reencaminhar esta mensagem para os nossos internos (se houverem)
                     // no final deste processo adicionamos a entrada a nossa tabela de expedição     
                     if (!strcmp(command, "ADVERTISE") && word_count == 2)
                     {
-                        neigh_aux = int_neighbours;
-                        while (neigh_aux != NULL)
-                        {
-                            if (writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+						if(checkTabEntry(first_entry, arg1) == 1)
+						{
+							if(flag_one_node == 0)
+							{
+								fprintf(stderr, "There was already a node with the id %s in network %s! We shall close the connection now\n", self.id, self.net);
+							    errcode = snprintf(message_buffer, 150, "UNREG %s %s %s", self.net, self.IP, self.port);  
+                                if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                                {
+                                    fprintf(stderr, "error in UNREG UDP message creation\n");
+                                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
+                                }
+                                if (sendUDP(fd_udp, regIP, regUDP, message_buffer, "Error getting address information for UDP server socket\n", 
+                                    "error in UNREG UDP message send\n") == ERROR)
+                                    fputs("We encountered an error unregistering from the nodes server. We will proceed execution and ignore it\n", stderr);
+                                else
+                                    udp_state = waiting_for_unregok;
+						    }
+						    else
+						    fprintf(stderr, "A node with the same id as one in the network tried to join! We shall close the connection now\n");
+							
+							freeViz(&external);
+							if(flag_one_node == 0)
+							{
+							    freeSelf(&self);
+							    FreeTabExp(&first_entry);
+							    network_state = NONODES;
+						    }
+						    else
+						    network_state = ONENODE;
+							while (msg_list != NULL)
                             {
-                                fprintf(stderr, "Error writing to internal neighbour when we receive ADVERTISE from our external neighbour");
-                                internalLeft(&first_entry, &n_obj, cache, &external,
-                                             backup, &neigh_aux, &neigh_tmp,
-                                             &int_neighbours, &first_interest, &self);
+                                msg_aux = msg_list;
+                                msg_list = msg_list->next;
+                                free(msg_aux->message);
+                                free(msg_aux);
+                                msg_aux = NULL;
                             }
-                            neigh_aux = neigh_aux->next;
-                        }
-                        first_entry = createinsertTabEntry(first_entry, arg1, external->fd);
+                            break;   
+						}
+						else
+						{
+						    neigh_tmp = NULL;
+                            neigh_aux = int_neighbours;
+                            while (neigh_aux != NULL)
+                            {
+                                if (writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                                {
+                                    fprintf(stderr, "Error writing to internal neighbour when we receive ADVERTISE from our external. We shall close the connection now\n");
+                                    internalLeft(&first_entry, &n_obj, cache, &external,
+                                                 backup, &neigh_aux, &neigh_tmp,
+                                                 &int_neighbours, &first_interest, &self);
+                                }
+                                neigh_tmp = neigh_aux;
+                                neigh_aux = neigh_aux->next;
+                            }
+                            first_entry = createinsertTabEntry(first_entry, arg1, external->fd);
+					    }
                     }
 
                     // para quando recebemos uma mensagem WITHDRAW do vizinho externo, reencaminhar esta mensagem para os nossos internos (se houverem)
                     // no final deste processo eliminamos a respetiva entrada da tabela de expedição correspondente ao id do nó que saiu da rede
                     if (!strcmp(command, "WITHDRAW") && word_count == 2)
                     {
+						neigh_tmp = NULL;
                         neigh_aux = int_neighbours;
                         while (neigh_aux != NULL)
                         {
                             if (writeTCP(neigh_aux->this->fd, strlen(msg_list->message), msg_list->message) == ERROR)
                             {
-                                fprintf(stderr, "Error writing to internal neighbour when we receive WITHDRAW from our external neighbour");
+                                fprintf(stderr, "Error writing to internal neighbour when we receive WITHDRAW from our external. We shall close the connection now\n");
                                 internalLeft(&first_entry, &n_obj, cache, &external,
                                              backup, &neigh_aux, &neigh_tmp,
                                              &int_neighbours, &first_interest, &self);
                             }
+                            neigh_tmp = neigh_aux;
                             neigh_aux = neigh_aux->next;
                         }
                         deleteTabEntryid(&first_entry, arg1);
-                        deleteInterestWITHDRAW(first_interest, arg1);
+                        deleteInterestWITHDRAW(&first_interest, arg1);
                         n_obj = deleteCacheid(cache, n_obj, arg1);
                     }
 
@@ -440,7 +507,7 @@ int main(int argc, char *argv[])
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                 {
                                     fprintf(stderr, "error in DATA TCP message creation\n");
-                                    exit(-1);
+                                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                                 }
                             }
                             else
@@ -450,7 +517,7 @@ int main(int argc, char *argv[])
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                 {
                                     fprintf(stderr, "error in NODATA TCP message creation\n");
-                                    exit(-1);
+                                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                                 }
                             }
                             if (writeTCP(external->fd, strlen(message_buffer), message_buffer) == ERROR)
@@ -462,7 +529,7 @@ int main(int argc, char *argv[])
                                 // porque caso contrário teríamos de lidar com o facto de que quando lêssemos as próximas mensagens que 
                                 // o externo já não se iria referir ao nó que nos enviou as mensagens. Esta lógica aplica-se nos restantes
                                 // erros de escrita para o external dentro do FD_ISSET(external->fd)
-                                fprintf(stderr, "Error writing to external->fd when we receive INTEREST from it. We shall close the connection now\n");
+                                fprintf(stderr, "Error writing to external neighbour when we receive INTEREST from it. We shall close the connection now\n");
                                 externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);
                                 while (msg_list != NULL)
                                 {
@@ -485,12 +552,12 @@ int main(int argc, char *argv[])
                                 if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                 {
                                     fprintf(stderr, "error in DATA TCP message creation\n");
-                                    exit(-1);
+                                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                                 }
 
                                 if (writeTCP(external->fd, strlen(message_buffer), message_buffer) == ERROR)
                                 {
-                                    fprintf(stderr, "Error writing to external->fd when we receive INTEREST from it. We shall close the connection now\n");
+                                    fprintf(stderr, "Error writing to external neighbour when we receive INTEREST from it. We shall close the connection now\n");
                                     externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);
                                     while (msg_list != NULL)
                                     {
@@ -519,18 +586,26 @@ int main(int argc, char *argv[])
                                         // funções de encaminhamento estão OK na rede o tab_aux_fd vai ser o fd de um interno
                                         if(writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message) == ERROR)
                                         {
-                                            neigh_aux = int_neighbours;
+                                            neigh_tmp = NULL;
+								            neigh_aux = int_neighbours;
                                             while (neigh_aux->this->fd != tab_aux->fd_sock)
+                                            {
+                                                neigh_tmp = neigh_aux;
                                                 neigh_aux = neigh_aux->next;
+                                            }
                                             if (neigh_aux)
+                                            {
+												fprintf(stderr, "Error forwarding INTEREST to internal neighbour. We shall close the connection now\n");
                                                 internalLeft(&first_entry, &n_obj, cache, &external,
                                                         backup, &neigh_aux, &neigh_tmp,
                                                         &int_neighbours, &first_interest, &self);
+                                            }
                                             // este else não é suposto acontecer nunca. significa que iterámos por todos os vizinhos internos
                                             // não encontrámos um com o fd de tab_aux.
                                             else
                                                 fprintf(stderr, "Error! We couldn't find the correct neighbour\n");
                                         }
+                                        else
                                         flag_no_dest = 0;
                                     }
                                     tab_aux = tab_aux->next;
@@ -575,7 +650,27 @@ int main(int argc, char *argv[])
                                     n_obj = saveinCache(cache, arg1, n_obj, N);
                                 }
                                 // reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
-                                writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+                                if(writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                                {
+									neigh_tmp = NULL;
+								    neigh_aux = int_neighbours;
+                                    while (neigh_aux->this->fd != interest_aux->fd)
+                                    {
+                                        neigh_tmp = neigh_aux;
+                                        neigh_aux = neigh_aux->next;
+                                    }
+                                    if (neigh_aux)
+                                    {
+										fprintf(stderr, "Error forwarding DATA to internal neighbour. We shall close the connection now\n");
+                                        internalLeft(&first_entry, &n_obj, cache, &external,
+                                                        backup, &neigh_aux, &neigh_tmp,
+                                                        &int_neighbours, &first_interest, &self);
+                                    }
+                                    // este else não é suposto acontecer nunca. significa que iterámos por todos os vizinhos internos
+                                    // não encontrámos um com o fd de interest_aux.
+                                    else
+                                        fprintf(stderr, "Error! We couldn't find the correct neighbour\n");		
+								}
                                 deleteInterest(&first_interest, arg1, interest_aux->fd);
                             }
                             if (we_used_interest_tmp)
@@ -610,7 +705,27 @@ int main(int argc, char *argv[])
                                 interest_tmp = interest_aux->next;
                                 we_used_interest_tmp = 1;
                                 // reencaminhamos a mensagem NODATA para o vizinho que fez esse pedido
-                                writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+                                if(writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                                {
+								    neigh_tmp = NULL;
+								    neigh_aux = int_neighbours;
+                                    while (neigh_aux->this->fd != interest_aux->fd)
+                                    {
+                                        neigh_tmp = neigh_aux;
+                                        neigh_aux = neigh_aux->next;
+                                    }
+                                    if (neigh_aux)
+                                    {
+										fprintf(stderr, "Error forwarding NODATA to internal neighbour. We shall close the connection now\n");
+                                        internalLeft(&first_entry, &n_obj, cache, &external,
+                                                        backup, &neigh_aux, &neigh_tmp,
+                                                        &int_neighbours, &first_interest, &self);
+                                    }
+                                    // este else não é suposto acontecer nunca. significa que iterámos por todos os vizinhos internos
+                                    // não encontrámos um com o fd de interest_aux.
+                                    else
+                                        fprintf(stderr, "Error! We couldn't find the correct neighbour\n");   	
+								}
                                 deleteInterest(&first_interest, arg1, interest_aux->fd);
                             }
                             if (we_used_interest_tmp)
@@ -641,14 +756,11 @@ int main(int argc, char *argv[])
         neigh_tmp = NULL; // neigh_tmp irá apontar para o vizinho interno prévio para motivos de remoção de um elemento da lista
         while (neigh_aux != NULL)
         {
-            printf("Estamos a iterar pela lista de vizinhos internos\n");
             // de momento de um vizinho interno só recebemos o new
             if (FD_ISSET(neigh_aux->this->fd, &rfds))
             {
-                printf("Este vizinho interno tem um read que não bloqueia\n");
                 if ((tcp_read_flag = readTCP(neigh_aux->this)) == MSG_FINISH)
                 {
-                    printf("Este vizinho interno enviou uma mensagem completa\n");
                     msg_list = processReadTCP(neigh_aux->this, 0);
                     while (msg_list != NULL)
                     {
@@ -669,35 +781,81 @@ int main(int argc, char *argv[])
                         // no final deste processo adicionamos a entrada a nossa tabela de expedição
                         if (!strcmp(command, "ADVERTISE") && word_count == 2)
                         {
-                            neigh_tmp = int_neighbours;
-                            while (neigh_tmp != NULL)
-                            {
-                                if(neigh_tmp->this->fd != neigh_aux->this->fd)
+							if(checkTabEntry(first_entry, arg1) == 1)
+							{
+								fprintf(stderr, "We just received an ADVERTISE from a node with the same id has a node already in the network. We shall close the connection now\n");
+                                int_neighbours = int_neighbours->next;
+                                if (close(neigh_aux->this->fd))
+                                    fprintf(stderr, "error closing file descriptor of internal neighbour: %s\n", strerror(errno));
+                                free(neigh_aux->this);
+                                free(neigh_aux);
+                                neigh_aux = NULL;			
+                                while (msg_list != NULL)
                                 {
-                                    writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
+                                    msg_aux = msg_list;
+                                    msg_list = msg_list->next;
+                                    free(msg_aux->message);
+                                    free(msg_aux);
+                                    msg_aux = NULL;
                                 }
-                                neigh_tmp = neigh_tmp->next;
-                            }
-                            writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
-                            first_entry = createinsertTabEntry(first_entry, arg1, neigh_aux->this->fd);
+                                break;					
+							}
+							else
+							{
+							    neigh_tmp2 = NULL;
+                                neigh_tmp1 = int_neighbours;
+                                while (neigh_tmp1 != NULL)
+                                {
+                                    if(neigh_tmp1->this->fd != neigh_aux->this->fd)
+                                    {
+                                        if(writeTCP(neigh_tmp1->this->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                                        {
+									        fprintf(stderr, "Error writing to internal neighbour when we receive ADVERTISE from another internal. We shall close the connection now\n");
+                                            internalLeft(&first_entry, &n_obj, cache, &external,
+                                                     backup, &neigh_tmp1, &neigh_tmp2,
+                                                          &int_neighbours, &first_interest, &self);	
+									    }
+                                    }
+                                    neigh_tmp2 = neigh_tmp1;
+                                    neigh_tmp1 = neigh_tmp1->next;
+                                }
+                                if(writeTCP(external->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                                {
+							        fprintf(stderr, "Error writing to external neighbour when we receive ADVERTISE from an internal. We shall close the connection now\n");
+                                    externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);	
+							    }
+                                first_entry = createinsertTabEntry(first_entry, arg1, neigh_aux->this->fd);
+						    }
                         }
 
                         // para quando recebemos uma mensagem WITHDRAW de um interno, reencaminhar esta mensagem para os outros internos (se houverem), bem como ao nosso externo
                         // no final deste processo eliminamos a respetiva entrada da tabela de expedição correspondente ao id do nó que saiu da rede
                         if (!strcmp(command, "WITHDRAW") && word_count == 2)
                         {
-                            neigh_tmp = int_neighbours;
-                            while (neigh_tmp != NULL)
+                            neigh_tmp2 = NULL;
+                            neigh_tmp1 = int_neighbours;
+                            while (neigh_tmp1 != NULL)
                             {
-                                if(neigh_tmp->this->fd != neigh_aux->this->fd) 
+                                if(neigh_tmp1->this->fd != neigh_aux->this->fd)
                                 {
-                                    writeTCP(neigh_tmp->this->fd, strlen(msg_list->message), msg_list->message);
+                                    if(writeTCP(neigh_tmp1->this->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                                    {
+									    fprintf(stderr, "Error writing to internal neighbour when we receive WITHDRAW from another internal. We shall close the connection now\n");
+                                        internalLeft(&first_entry, &n_obj, cache, &external,
+                                                     backup, &neigh_tmp1, &neigh_tmp2,
+                                                          &int_neighbours, &first_interest, &self);	
+									}
                                 }
-                                neigh_tmp = neigh_tmp->next;
+                                neigh_tmp2 = neigh_tmp1;
+                                neigh_tmp1 = neigh_tmp1->next;
                             }
-                            writeTCP(external->fd, strlen(msg_list->message), msg_list->message);
+                            if(writeTCP(external->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                            {
+							    fprintf(stderr, "Error writing to external neighbour when we receive WITHDRAW from an internal. We shall close the connection now\n");
+                                externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);	
+							}
                             deleteTabEntryid(&first_entry, arg1);
-                            deleteInterestWITHDRAW(first_interest, arg1);
+                            deleteInterestWITHDRAW(&first_interest, arg1);
                             n_obj = deleteCacheid(cache, n_obj, arg1);
                         }
 
@@ -718,7 +876,7 @@ int main(int argc, char *argv[])
                                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                     {
                                         fprintf(stderr, "error in DATA TCP message creation\n");
-                                        exit(-1);
+                                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                                     }
                                 }
                                 else
@@ -728,10 +886,25 @@ int main(int argc, char *argv[])
                                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                     {
                                         fprintf(stderr, "error in NODATA TCP message creation\n");
-                                        exit(-1);
+                                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                                     }
                                 }
-                                writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                                if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                                {
+								    fprintf(stderr, "Error writing to internal neighbour when we receive INTEREST from it. We shall close the connection now\n");
+                                    internalLeft(&first_entry, &n_obj, cache, &external,
+                                                     backup, &neigh_aux, &neigh_tmp,
+                                                          &int_neighbours, &first_interest, &self);	
+                                    while (msg_list != NULL)
+                                    {
+                                        msg_aux = msg_list;
+                                        msg_list = msg_list->next;
+                                        free(msg_aux->message);
+                                        free(msg_aux);
+                                        msg_aux = NULL;
+                                    }
+                                    break;	
+								}
                             }
                             else
                             {
@@ -743,9 +916,24 @@ int main(int argc, char *argv[])
                                     if (message_buffer == NULL || errcode < 0 || errcode >= 150)
                                     {
                                         fprintf(stderr, "error in DATA TCP message creation\n");
-                                        exit(-1);
+                                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                                     }
-                                    writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                                    if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                                    {
+								        fprintf(stderr, "Error writing to internal neighbour when we receive INTEREST from it. We shall close the connection now\n");
+                                        internalLeft(&first_entry, &n_obj, cache, &external,
+                                                     backup, &neigh_aux, &neigh_tmp,
+                                                          &int_neighbours, &first_interest, &self);	
+                                        while (msg_list != NULL)
+                                        {
+                                            msg_aux = msg_list;
+                                            msg_list = msg_list->next;
+                                            free(msg_aux->message);
+                                            free(msg_aux);
+                                            msg_aux = NULL;
+                                        }
+                                        break;	
+								    }
                                 }
                                 else
                                 {
@@ -759,7 +947,36 @@ int main(int argc, char *argv[])
                                     {
                                         if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
                                         {
-                                            writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message);
+                                            if(writeTCP(tab_aux->fd_sock, strlen(msg_list->message), msg_list->message) == ERROR)
+                                            {
+												if(external->fd == tab_aux->fd_sock)
+												{
+												    fprintf(stderr, "Error forwarding INTEREST to external neighbour. We shall close the connection now\n");
+                                                    externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);	
+												}
+												else
+												{
+											        neigh_tmp2 = NULL;
+								                    neigh_tmp1 = int_neighbours;
+                                                    while (neigh_tmp1->this->fd != tab_aux->fd_sock)
+                                                    {
+                                                        neigh_tmp2 = neigh_tmp1;
+                                                        neigh_tmp1 = neigh_tmp1->next;
+                                                    }
+                                                    if (neigh_tmp1)
+                                                    {
+													    fprintf(stderr, "Error forwarding INTEREST to other internal neighbour. We shall close the connection now\n");
+                                                        internalLeft(&first_entry, &n_obj, cache, &external,
+                                                                backup, &neigh_tmp1, &neigh_tmp2,
+                                                                &int_neighbours, &first_interest, &self);
+                                                    }
+                                                    // este else não é suposto acontecer nunca. significa que iterámos por todos os vizinhos internos
+                                                    // não encontrámos um com o fd de tab_aux.
+                                                    else
+                                                        fprintf(stderr, "Error! We couldn't find the correct neighbour\n");		
+											    }
+											}
+										    else
                                             flag_no_dest = 0;
                                         }
                                         tab_aux = tab_aux->next;
@@ -804,7 +1021,35 @@ int main(int argc, char *argv[])
                                         n_obj = saveinCache(cache, arg1, n_obj, N);
                                     }
                                     // reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
-                                    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+                                    if(writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                                    {
+										if(external->fd == interest_aux->fd)
+										{
+										    fprintf(stderr, "Error forwarding DATA to external neighbour. We shall close the connection now\n");
+                                            externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);	
+									    }
+									    else
+									    {
+									        neigh_tmp2 = NULL;
+								            neigh_tmp1 = int_neighbours;
+                                            while (neigh_tmp1->this->fd != interest_aux->fd)
+                                            {
+                                                neigh_tmp2 = neigh_tmp1;
+                                                neigh_tmp1 = neigh_tmp1->next;
+                                            }
+                                            if (neigh_tmp1)
+                                            {
+												fprintf(stderr, "Error forwarding DATA to other internal neighbour. We shall close the connection now\n");
+                                                internalLeft(&first_entry, &n_obj, cache, &external,
+                                                            backup, &neigh_tmp1, &neigh_tmp2,
+                                                            &int_neighbours, &first_interest, &self);
+                                            }
+                                            // este else não é suposto acontecer nunca. significa que iterámos por todos os vizinhos internos
+                                            // não encontrámos um com o fd de interest_aux.
+                                            else
+                                                fprintf(stderr, "Error! We couldn't find the correct neighbour\n");		
+								        }
+								    }
                                     deleteInterest(&first_interest, arg1, interest_aux->fd);
                                 }
                                 if (we_used_interest_tmp)
@@ -839,7 +1084,35 @@ int main(int argc, char *argv[])
                                     interest_tmp = interest_aux->next;
                                     we_used_interest_tmp = 1;
                                     // reencaminhamos a mensagem NODATA para o vizinho que fez esse pedido
-                                    writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message);
+                                    if(writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message) == ERROR)
+                                    {
+									    if(external->fd == interest_aux->fd)
+										{
+										    fprintf(stderr, "Error forwarding NODATA to external neighbour. We shall close the connection now\n");
+                                            externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);	
+									    }
+									    else
+									    {
+									        neigh_tmp2 = NULL;
+								            neigh_tmp1 = int_neighbours;
+                                            while (neigh_tmp1->this->fd != interest_aux->fd)
+                                            {
+                                                neigh_tmp2 = neigh_tmp1;
+                                                neigh_tmp1 = neigh_tmp1->next;
+                                            }
+                                            if (neigh_tmp1)
+                                            {
+												fprintf(stderr, "Error forwarding NODATA to other internal neighbour. We shall close the connection now\n");
+                                                internalLeft(&first_entry, &n_obj, cache, &external,
+                                                            backup, &neigh_tmp1, &neigh_tmp2,
+                                                            &int_neighbours, &first_interest, &self);
+                                            }
+                                            // este else não é suposto acontecer nunca. significa que iterámos por todos os vizinhos internos
+                                            // não encontrámos um com o fd de interest_aux.
+                                            else
+                                                fprintf(stderr, "Error! We couldn't find the correct neighbour\n");		
+								        }		
+								    }
                                     deleteInterest(&first_interest, arg1, interest_aux->fd);
                                 }
                                 if (we_used_interest_tmp)
@@ -862,8 +1135,11 @@ int main(int argc, char *argv[])
                     // no caso em que não removemos o vizinho interno da lista
                     // simplesmente avançamos para o vizinho interno seguinte em neigh_aux e colocamos
                     // neigh_tmp a apontar para o vizinho interno atual
-                    neigh_tmp = neigh_aux;
-                    neigh_aux = neigh_aux->next;
+                    if(neigh_aux != NULL)
+                    {
+                        neigh_tmp = neigh_aux;
+                        neigh_aux = neigh_aux->next;
+                    }
                 }
                 // vizinho interno fez leave e fechou as conexões
                 else if (tcp_read_flag == MSG_CLOSED)
@@ -1155,6 +1431,7 @@ int main(int argc, char *argv[])
             }
             else if (instr_code == LEAVE && network_state != NONODES)
             {
+				flag_one_node = 0;
                 we_are_reg = 0;
                 // criar string para enviar o desregisto (?isto é uma palavra) do nó
                 errcode = snprintf(message_buffer, 150, "UNREG %s %s %s", self.net, self.IP, self.port);  
@@ -1209,7 +1486,7 @@ int main(int argc, char *argv[])
 
                 if(checkCache(cache, name, n_obj) == 1)
                 {
-                    printf("Object %s found in our own cache!\n", name);
+                    printf("Object %s was already in our own cache!\n", name);
                 }
                 else
                 {
@@ -1222,11 +1499,11 @@ int main(int argc, char *argv[])
                             {
                                 if(checkObjectList(head, name) == 1)
                                 {
-                                    printf("Object %s found in our own list of objects!\n", name);
+                                    printf("Object %s was already in our own list of objects!\n", name);
                                 }
                                 else
                                 {
-                                    printf("Object %s not found in our own list of objects!\n", name);
+                                    printf("Object %s isn't in our own list of objects!\n", name);
                                 }
                             }
                             if(!strcmp(tab_aux->id_dest, id) && tab_aux->fd_sock != SELFFD)
@@ -1237,9 +1514,40 @@ int main(int argc, char *argv[])
                                     fprintf(stderr, "error in INTEREST TCP message creation\n");
                                     safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                                 }
-                                writeTCP(tab_aux->fd_sock, strlen(message_buffer), message_buffer);
-                                if(checkInterest(first_interest, name, SELFFD) != 1)
-                                    first_interest = addInterest(first_interest, name, SELFFD);
+                                if(writeTCP(tab_aux->fd_sock, strlen(message_buffer), message_buffer) == ERROR)
+                                {
+								    if(external->fd == tab_aux->fd_sock)
+									{
+						                fprintf(stderr, "Error sending INTEREST to external neighbour. We shall close the connection now\n");
+                                        externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self);	
+									}
+									else
+									{
+										neigh_tmp2 = NULL;
+								        neigh_tmp1 = int_neighbours;
+                                        while (neigh_tmp1->this->fd != tab_aux->fd_sock)
+                                        {
+                                            neigh_tmp2 = neigh_tmp1;
+                                            neigh_tmp1 = neigh_tmp1->next;
+                                        }
+                                        if (neigh_tmp1)
+                                        {
+										    fprintf(stderr, "Error sending INTEREST to internal neighbour. We shall close the connection now\n");
+                                            internalLeft(&first_entry, &n_obj, cache, &external,
+                                                                backup, &neigh_tmp1, &neigh_tmp2,
+                                                                &int_neighbours, &first_interest, &self);
+                                        }
+                                        // este else não é suposto acontecer nunca. significa que iterámos por todos os vizinhos internos
+                                        // não encontrámos um com o fd de tab_aux.
+                                        else
+                                            fprintf(stderr, "Error! We couldn't find the correct neighbour\n");		
+								    }	
+								}
+								else
+								{
+                                    if(checkInterest(first_interest, name, SELFFD) != 1)
+                                        first_interest = addInterest(first_interest, name, SELFFD);
+                                }
                             }
                             tab_aux = tab_aux->next;
                         }
@@ -1270,7 +1578,6 @@ int main(int argc, char *argv[])
                         udp_state = waiting_for_unregok;
 
                     // após tirar o registo no servidor de nós, devemos terminar todas as conexões TCP ativas 
-
                     // terminar a sessão TCP com o vizinho externo
                     freeViz(&external);
                     // terminar todas as conexões com vizinhos internos
@@ -1336,7 +1643,6 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-
 void safeExit(char **cache, int N, viz **external, viz **backup, viz **new,
         tab_entry **first_entry, list_objects **head, list_interest **first_interest,
         no *self)
@@ -1354,14 +1660,13 @@ void safeExit(char **cache, int N, viz **external, viz **backup, viz **new,
 }
 
 void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **external,
-        viz *backup,  
-        internals **int_neighbours, list_interest **first_interest, no *self)
+        viz *backup, internals **int_neighbours, list_interest **first_interest, no *self)
 {
     char message_buffer[150];
     tab_entry *tab_aux = *first_entry;
     tab_entry *tab_tmp = NULL;
     int we_used_tab_tmp = 0, errcode, we_used_interest_tmp = 0;
-    internals *neigh_aux;
+    internals *neigh_aux, *neigh_tmp;
     list_interest *interest_aux, *interest_tmp;
     while(tab_aux != NULL)
     {
@@ -1375,13 +1680,19 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
                 fprintf(stderr, "error in WITHDRAW TCP message creation\n");
                 exit(-1);
             }
+            neigh_tmp = NULL;
             neigh_aux = *int_neighbours;
             while (neigh_aux != NULL)
             {
-                writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                {
+                    fprintf(stderr, "Error writing WITHDRAW to internal neighbour. We shall close the connection now\n");
+                    internalLeft(first_entry, n_obj, cache, external, backup, &neigh_aux, &neigh_tmp, int_neighbours, first_interest, self);
+			    }
+                neigh_tmp = neigh_aux;
                 neigh_aux = neigh_aux->next;
             }
-            deleteInterestWITHDRAW(*first_interest, tab_aux->id_dest);
+            deleteInterestWITHDRAW(first_interest, tab_aux->id_dest);
             *n_obj = deleteCacheid(cache, *n_obj, tab_aux->id_dest);
             deleteTabEntryfd(first_entry, tab_aux->fd_sock);
         }
@@ -1422,7 +1733,7 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
     // neste caso nós somos o nosso próprio vizinho de backup
     if (!strcmp(self->IP, backup->IP) && !strcmp(self->port, backup->port))
     {
-        printf("Fomos abandonados pelo nosso externo e éramos o nosso backup\n");
+        printf("We were abandoned by our external neighbour and our backup neighbour was us\n");
         free(*external);
         // neste caso vamos promover um dos vizinhos internos a vizinho externo
         // o vizinho que vai ser promovido vai ser o do topo da lista
@@ -1432,7 +1743,6 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
             neigh_aux = *int_neighbours;
             *int_neighbours = (*int_neighbours)->next;     
             free(neigh_aux);
-            neigh_aux = *int_neighbours;
             // enviar um EXTERN com os dados do vizinho interno promovido a vizinho externo
             // para o notificar  
             errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", (*external)->IP, (*external)->port);  
@@ -1441,12 +1751,23 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
                 fprintf(stderr, "error in EXTERN TCP message creation\n");
                 exit(-1);
             }
-            writeTCP((*external)->fd, strlen(message_buffer), message_buffer);
+            if(writeTCP((*external)->fd, strlen(message_buffer), message_buffer) == ERROR)
+            {
+			    fprintf(stderr, "Error writing EXTERN to external (old internal). We shall close the connection now\n");
+                externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self);	
+			}
             // para todos os vizinhos internos que não foram promovidos a vizinhos externos, notificá-los também
             // que têm um novo vizinho externo
-            while (neigh_aux)
+            neigh_tmp = NULL;
+            neigh_aux = *int_neighbours;
+            while (neigh_aux != NULL)
             {
-                writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                {
+                    fprintf(stderr, "Error writing EXTERN to internal neighbour. We shall close the connection now\n");
+                    internalLeft(first_entry, n_obj, cache, external, backup, &neigh_aux, &neigh_tmp, int_neighbours, first_interest, self);
+			    }
+                neigh_tmp = neigh_aux;
                 neigh_aux = neigh_aux->next;
             }
         }
@@ -1454,7 +1775,7 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
         // internos, então vamos sozinhos numa rede
         else
         {
-            printf("Não tínhamos vizinhos internos\n");
+            printf("We had no internal neighbours\n");
             network_state = ONENODE;
             *external = NULL;
         }
@@ -1480,7 +1801,11 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
             fprintf(stderr, "error in NEW TCP message creation when previous external closes connection\n");
             exit(-1);
         }
-        writeTCP((*external)->fd, strlen(message_buffer), message_buffer);
+        if(writeTCP((*external)->fd, strlen(message_buffer), message_buffer) == ERROR)
+        {
+		    fprintf(stderr, "Error writing NEW to external. We shall close the connection now\n");
+            externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self);	
+		}
         //waiting_for_backup = 1; // we're outnumbered, need backup
         //se tivermos internos que não sabem ainda que o nosso externo (o seu backup) mudou, notificá-los através da mensagem EXTERN
         if(*int_neighbours)
@@ -1491,16 +1816,39 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
                 fprintf(stderr, "error in EXTERN TCP message creation\n");
                 exit(-1);
             }
+            neigh_tmp = NULL;
             neigh_aux = *int_neighbours;
             while (neigh_aux != NULL)
             {
-                writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer);
+                if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                {
+                    fprintf(stderr, "Error writing EXTERN to internal neighbour. We shall close the connection now\n");
+                    internalLeft(first_entry, n_obj, cache, external, backup, &neigh_aux, &neigh_tmp, int_neighbours, first_interest, self);
+			    }
+                neigh_tmp = neigh_aux;
                 neigh_aux = neigh_aux->next;
             }
         }
         // possivelmente deixar alguma informação na estrutura do backup que está desatualizado
         // mas como estamos waiting_for_backup, podemos deduzir isso daí
-        writeAdvtoEntryNode(*first_entry, errcode, message_buffer, (*external)->fd);
+        
+        tab_aux = *first_entry;
+        while(tab_aux)
+        {
+            errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n", tab_aux->id_dest);  
+            if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+            {
+                fprintf(stderr, "error in ADVERTISE TCP message creation\n");
+                exit(-1);  
+            }
+            if(writeTCP((*external)->fd, strlen(message_buffer), message_buffer) == ERROR)
+            {
+                fprintf(stderr, "error sending ADVERTISE TCP message to external neighbour. We shall close the connection now\n");
+                externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self);
+                break;
+	        }
+		    tab_aux = tab_aux->next;
+        }
     }
 }
 
@@ -1512,7 +1860,7 @@ void internalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
     tab_entry *tab_aux = *first_entry;
     tab_entry *tab_tmp = NULL;
     int we_used_tab_tmp = 0, errcode, we_used_interest_tmp = 0;
-    internals *neigh_tmp2;
+    internals *neigh_tmp1, *neigh_tmp2;
     list_interest *interest_aux, *interest_tmp;
     while(tab_aux != NULL)
     {
@@ -1526,17 +1874,27 @@ void internalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
                 fprintf(stderr, "error in WITHDRAW TCP message creation\n");
                 exit(-1);
             }
-            neigh_tmp2 = *int_neighbours;
-            while (neigh_tmp2 != NULL)
+            neigh_tmp2 = NULL;
+            neigh_tmp1 = *int_neighbours;
+            while (neigh_tmp1 != NULL)
             {
-                if(neigh_tmp2->this->fd != (*neigh_aux)->this->fd) 
+                if(neigh_tmp1->this->fd != (*neigh_aux)->this->fd) 
                 {
-                    writeTCP(neigh_tmp2->this->fd, strlen(message_buffer), message_buffer);
+                    if(writeTCP(neigh_tmp1->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                    {
+                        fprintf(stderr, "Error writing WITHDRAW to different internal neighbour. We shall close the connection now\n");
+                        internalLeft(first_entry, n_obj, cache, external, backup, &neigh_tmp1, &neigh_tmp2, int_neighbours, first_interest, self);
+				    }
                 }
-                neigh_tmp2 = neigh_tmp2->next;
+                neigh_tmp2 = neigh_tmp1;
+                neigh_tmp1 = neigh_tmp1->next;
             }
-            writeTCP((*external)->fd, strlen(message_buffer), message_buffer);
-            deleteInterestWITHDRAW(*first_interest, tab_aux->id_dest);
+            if(writeTCP((*external)->fd, strlen(message_buffer), message_buffer) == ERROR)
+            {
+		        fprintf(stderr, "Error writing WITHDRAW to external neighbour. We shall close the connection now\n");
+                externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self);	
+		    }
+            deleteInterestWITHDRAW(first_interest, tab_aux->id_dest);
             *n_obj = deleteCacheid(cache, *n_obj, tab_aux->id_dest);
             deleteTabEntryfd(first_entry, tab_aux->fd_sock);
         }
@@ -1580,7 +1938,7 @@ void internalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
     {
         *int_neighbours = (*int_neighbours)->next;
         if (!*int_neighbours)
-            printf("De facto, o int_neighbours->next estava a NULL e ficámos sem vizinhos internos\n");
+            printf("We no longer have internal neighbours\n");
         // limpar a memória do vizinho interno removido        
         free((*neigh_aux)->this);
         free(*neigh_aux);

@@ -1,7 +1,7 @@
 #ifndef SEARCH_H
 #define SEARCH_H
 
-// estrutura auxiliar para cache (caso WITHDRAW retirar elementos com o id)
+// estrutura correspondente a uma lista auxiliar para cache (caso WITHDRAW retirar elementos com o id)
 typedef struct cache_aux{
     char *obj;
     struct cache_aux *next;
@@ -20,29 +20,64 @@ typedef struct list_interest{
     struct list_interest *next;
 }list_interest;
 
+/**
+ * addInterest: função que adiciona um pedido de interesse à lista de pedidos
+ * \param *first_interest: ponteiro para o primeiro pedido da lista (topo da lista)
+ * \param *obj: ponteiro para a string correspondente ao nome do objeto que foi pedido
+ * \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP donde veio a mensagem de interesse
+ * \retorna o topo da lista atualizado
+ */
 list_interest *addInterest(list_interest *first_interest, char *obj, int fd);
 
+/**
+ * deleteInterest: função que elimina um pedido de interesse da lista de pedidos
+ * \param **first_interest: duplo ponteiro para o primeiro pedido da lista (topo da lista)
+ * \param obj: ponteiro para a string correspondente ao nome do objeto presente no pedido a eliminar
+ * \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP donde veio a mensagem de interesse
+ */
 void deleteInterest(list_interest **first_interest, char *obj, int fd);
 
+/**
+ * deleteInterestfd: função que elimina um pedido de interesse da lista de pedidos (usada nos casos em que perdemos conexão com vizinhos, para eliminar possíveis pedidos que tenham vindo desse lado)
+ * \param **first_interest: duplo ponteiro para o primeiro pedido da lista (topo da lista)
+ * \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP donde veio a mensagem de interesse
+ */
 void deleteInterestfd(list_interest **first_interest, int fd);
 
-void deleteInterestWITHDRAW(list_interest *first_interest, char *id);
+/**
+ * deleteInterestWITHDRAW: função que elimina da lista de pedidos todos os pedidos para um objeto que tivesse identificador id (usada quando recebemos mensagem WITHDRAW)
+ * \param **first_interest: duplo ponteiro para o primeiro pedido da lista (topo da lista)
+ * \param id: inteiro correspondente ao identificador do nó que saiu da rede (que recebemos na mensagem WITHDRAW)
+ */
+void deleteInterestWITHDRAW(list_interest **first_interest, char *id);
 
+/**
+ * checkInterest: função que verifica se um determinado pedido é igual a um que já exista na lista de pedidos (pedido igual vindo do mesmo vizinho)
+ * \param *obj: ponteiro para a string correspondente ao nome do objeto que foi pedido
+ * \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP donde veio a mensagem de interesse
+ * \retorna 1 caso o mesmo pedido tenha vindo do mesmo vizinho, 0 caso contrário
+ */
 int checkInterest(list_interest *first_interest, char *obj, int fd);
 
+/**
+ * FreeInterestList: função que liberta a memória alocada na lista de pedidos de interesse
+ * \param **first_interest: duplo ponteiro para o primeiro pedido da lista (topo da lista)
+ */
 void FreeInterestList(list_interest **first_interest);
 
 /**
  * getidfromName: função que extrai do nome introduzido pelo comando "get" o ientificador do nó destino para a pesquisa do objeto
  * \param name: ponteiro para a string correspondente ao nome introduzido pelo comando "get"
  * \param id: ponteiro para a string correspondente ao identificador do nó que será retornado no final desta função
+ * \retorna um ponteiro para a string correspondente ao identificador do nó 
  */
 char *getidfromName(char *name, char *id);
 
-
-/** getConcatString: função que concatena duas strings numa só e retorna no final o ponteiro para string resultante (utilizada na criação de objetos para juntar id ao subnome)
+/** 
+ * getConcatString: função que concatena duas strings numa só (utilizada na criação de objetos para juntar id ao subnome)
  * \param str1: ponteiro para a primeira string (corresponderá ao identificador do nó)
  * \param str2: ponteiro para a segunda string (corresponderá ao subnome do objeto)
+ * \retorna um ponteiro para a string resultante
  */
 char *getConcatString( const char *str1, const char *str2);
 
@@ -58,6 +93,7 @@ int checkObjectList(list_objects *head_obj, char *name);
  * \param head: ponteiro para o primeiro objeto da lista de objetos (topo da lista)
  * \param subname: ponteiro para a string correspondente ao subnome do objeto introduzido no comando "create"
  * \param id: ponteiro para a string correspondente ao identificador do nó da aplicação 
+ * \retorna o topo da lista atualizado
  */
 list_objects *createinsertObject(list_objects *head, char *subname, char *id);
 
@@ -84,7 +120,7 @@ int checkCache(char **cache, char *name, int n_obj);
  * \param name: ponteiro para a string correspondente ao nome do objeto a verificar
  * \param n_obj: inteiro correspondente ao número de objetos presentes na cache
  * \param N: capacidade da cache
- * \return n_obj atualizado
+ * \retorna n_obj atualizado
  */
 int saveinCache(char **cache, char *name, int n_obj, int N);
 
@@ -101,16 +137,29 @@ void printCache(char **cache, int n_obj, int N);
  */
 void clearCache(char **cache, int n_obj);
 
+/** deleteCacheid: função que elimina da cache todos os objetos que possuem identificador id
+ * \param n_obj: inteiro correspondente ao número de objetos presentes na cache
+ * \param *id: ponteiro para a string correspondente ao identificador dum nó
+ * \retorna n_obj atualizado
+ */
 int deleteCacheid(char **cache, int n_obj, char *id);
 
+/** 
+ * createinsertCacheAux: função que cria um elemento e adiciona a lista auxiliar (basicamente cria e adiciona um nó a lista simplesmente ligada)
+ * \param *head: ponteiro para o primeiro elemento da lista auxiliar (topo da lista)
+ * \param id: ponteiro para a string correspondente ao nome do objeto
+ * \retorna o topo da lista atualizado
+ */
 cache_aux *createinsertCacheAux(cache_aux *head_c, char *objct);
 
+/** FreeCacheAuxList: função que liberta a memória alocada pela lista auxiliar
+ * \param **head_c: duplo ponteiro para o primeiro elemento da lista auxiliar (topo da lista)
+ */
 void FreeCacheAuxList(cache_aux **head_c);
-
 
 /** createCache: cria uma cache de N char* e coloca-os todos a NULL
  * \param N: capacidade da cache
- * \return cache criada
+ * \retorna cache criada
  */
 char **createCache(int N);
 

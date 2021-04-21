@@ -94,23 +94,23 @@ void deleteInterestfd(list_interest **first_interest, int fd)
     }
 }
 
-void deleteInterestWITHDRAW(list_interest *first_interest, char *id)
+void deleteInterestWITHDRAW(list_interest **first_interest, char *id)
 {
     char *ident;
-    list_interest *interest_aux = first_interest;
+    list_interest *interest_aux = *first_interest;
     list_interest *interest_tmp = NULL;
     int we_used_interest_tmp = 0;
     
     while(interest_aux != NULL)
     {
         ident = NULL;
-	ident = getidfromName(interest_aux->obj, ident);
+	    ident = getidfromName(interest_aux->obj, ident);
         
         if(!strcmp(ident, id))
         {
             interest_tmp = interest_aux->next;
             we_used_interest_tmp = 1;
-            deleteInterest(&first_interest, interest_aux->obj, interest_aux->fd);
+            deleteInterest(first_interest, interest_aux->obj, interest_aux->fd);
         }
 
         if(we_used_interest_tmp)
@@ -336,7 +336,7 @@ void printCache(char **cache, int n_obj, int N)
     printf("Cache (Size:%d)\nNº objects stored: %d\n", N, n_obj);
     for(i=0; i<n_obj; i++)
     {
-        printf("%s\n",cache[i]);
+        printf("Object %d -> %s\n",i+1,cache[i]);
     }
 }
 

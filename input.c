@@ -136,7 +136,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format in command!\nCorrect format:\nshow<space>topology<ENTER>\nst<ENTER>\n");
+			printf("Wrong format in command!\nCorrect formats:\nshow<space>topology<ENTER>\nst<ENTER>\n");
 		}
 	}
 	else if((strcmp("show",command) == 0 && strcmp("routing",second) == 0) || strcmp("sr",command) == 0)
@@ -147,7 +147,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format in command!\nCorrect format:\nshow<space>routing<ENTER>\nsr<ENTER>\n");
+			printf("Wrong format in command!\nCorrect formats:\nshow<space>routing<ENTER>\nsr<ENTER>\n");
 		}
 	}
 	else if((strcmp("show",command) == 0 && strcmp("cache",second) == 0) || strcmp("sc",command) == 0)
@@ -158,7 +158,7 @@ char *readCommand(enum instr *instr_code)
 		}
 		else
 		{
-			printf("Wrong format in command!\nCorrect format:\nshow<space>cache<ENTER>\nsc<ENTER>\n");
+			printf("Wrong format in command!\nCorrect formats:\nshow<space>cache<ENTER>\nsc<ENTER>\n");
 		}
 	}
 	else if(strcmp("leave",command) == 0)

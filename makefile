@@ -3,7 +3,7 @@ TARGET = ndn
 CC = gcc
 
 #  Compiler Flags
-CFLAGS= -Wall -g
+CFLAGS= -Wall -Wextra -pedantic -g
 
 HEADERS = $(wildcard *.h)
 OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
