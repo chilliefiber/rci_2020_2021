@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include "input.h"
 #include "errcheck.h"
@@ -195,7 +196,7 @@ char *readCommand(enum instr *instr_code)
 
 int checkDigit(char word[])
 {
-  int i = 0;
+  size_t i = 0;
 	
   // verificar se todos os caracteres de uma string não números entre 0 e 9
   // se sim retornar 1, se não retornar 0 e imprimir mensagem de erro
@@ -233,8 +234,8 @@ int isPort(char port[])
 
 int isName(char name[])
 { 
-	int i, count_point = 0;
-	
+	int count_point = 0;
+    size_t i;	
 	if(name[0] == '.' && name[1] == '\n')
 	{
 		return 0;
@@ -270,3 +271,78 @@ int countblankSpace(char terminal[])
 	return counter;
 }
 
+int checkEntryArgs(char **argv, int argc, char **IP, char **TCP, char **regIP, char **regUDP, int *N)
+{
+    int errcode;
+    if(argc < 3 || argc > 6)
+    {
+        printf("Invalid number of arguments!\n");
+        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+        return END_EXECUTION;
+    }
+    else
+    {
+        *IP = argv[1];
+        *TCP = argv[2];
+        if(!isIP(*IP) || !isPort(*TCP))
+        {
+            if(!isIP(*IP))
+                printf("Invalid IP address! Error in IP argument\n");
+            if(!isPort(*TCP))
+                printf("Invalid TCP port! Error in TCP argument\n");
+            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+            return END_EXECUTION;
+        }
+    }
+
+    if(argc == 5 || argc == 6)
+    {
+        *regIP = argv[3];
+        *regUDP = argv[4];
+        if(!isIP(*regIP) || !isPort(*regUDP))
+        {
+            if(!isIP(*regIP))
+                printf("Invalid regIP address! Error in regIP argument\n");
+            if(!isPort(*regUDP))
+                printf("Invalid regUDP port! Error in regUDP argument\n");
+            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+            return END_EXECUTION;
+        }
+    }
+
+    if(argc == 6 || argc == 4)
+    {
+        if(checkDigit(argv[argc - 1]) == 1)
+        {
+            if ((errcode = sscanf(argv[argc-1], "%d", &(*N))) == EOF)
+                fprintf(stderr, "Error reading size of cache: %s\n", strerror(errno));
+            // é pouco explícito na man page o que acontece para o caso de devolver 0, assumimos que não mexe no ERRNO
+            else if(!errcode)
+                fprintf(stderr, "Error reading size of cache\n");
+            if (errcode != 1)
+                return END_EXECUTION;
+            if(*N == 0)
+            {
+                printf("Invalid size for cache! Must be able to save at least 1 object!\n");
+                printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+                return END_EXECUTION;
+            } 
+        }
+        else
+        {
+            printf("Invalid size for cache!\n");
+            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
+            return END_EXECUTION;   
+        }
+    }
+    
+    if(argc == 5 || argc == 3) 
+        *N = 2;
+
+    if(argc == 3 || argc == 4)
+    {
+        *regIP = "193.136.138.142";
+        *regUDP = "59000";
+    }
+    return NO_ERROR;
+}

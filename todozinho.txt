@@ -1,4 +1,3 @@
-
 Reescrever todo o código UDP, utilizando timers bloqueantes
 
 Seguir os passos da descrição que dei no mail ao sanguino sobre a comunicação UDP
@@ -6,12 +5,32 @@ Seguir os passos da descrição que dei no mail ao sanguino sobre a comunicaçã
 Ir ao codigo do waiting_for_list terminar a saida da rede quando nao deu para ligar a nenhum no JOIN_ID. Fazer também no stdin JOIN_LINK (sim)
 Testar com um servidor de nos no netcat
 
-Adicionar a escolha de um elemento aleatorio da lista
+Adicionar a escolha de um elemento aleatorio da lista - FEITO, testado!
 
-Adicionar o JOIN SERVDOWN
+Adicionar o JOIN SERVDOWN - falta a parte toda do encaminhamento/cache, mas o código que tínhamos antes já lá está
 
 Adicionar as verificações de todos os valores de saida do read
 
 Adicionar a mudança para malloc
+
+Corrigir o safeExit, para retornar tanto EXIT_FAILURE como EXIT_SUCCESS
+
+DUVIDA - temos de fechar o fd UDP sempre que escrevemos/lemos? Nós deixamos o tipo ativo, com um servidor feito. É para mudar?
+
+DUVIDA - JOIN_ID: a gente de momento escolhe um aleatoriamente, se esse falhar retira-o da lista e vai iterando desde o início tentando
+todos até um dar, como eu descrevi no e-mail. Lembrei-me que posso enviar o UNREG do tipo que falhar a partir do tipo que se está a conectar também. Faço isso?
+
+DUVIDA - random function: há problema de não lhe darmos a seed? ele faz seed automaticamente com 1 nesse caso
+
+DUVIDA - o professor é contra funçoes no main.c - Organização do programa em geral
+
+DUVIDA - aquelas coisas que eu me queixei na cache (aquelas copias desnecessarias)
+
+FUNCIONALIDADE EXTRA
+-join servdown
+-juntar a um elemento aleatorio da lista
+-robustez do UDP (como falado no email)
+-cache com numero aleatorio de objetos
+-read com buffer "infinita" (ou possivelmente com um valor super elevado, que cresce dinamicamente até lá com memcpy e memset)
 
 Reler tudo

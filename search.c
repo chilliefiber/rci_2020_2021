@@ -160,7 +160,7 @@ void FreeInterestList(list_interest **first_interest)
 
 char *getidfromName(char *name, char *id)
 {
-    int i, len = 0;
+    size_t i, len = 0;
     for(i=0; i<strlen(name); i++)
     {
         if(i>0)

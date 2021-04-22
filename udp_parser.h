@@ -10,7 +10,7 @@ typedef struct node_list{
     struct node_list *next;
 } node_list;
 
-int parseNodeListRecursive(char* datagram, node_list **list);
+int parseNodeListRecursive(char* datagram, node_list **list, int *num_nodes);
 char* isNodesList(char* datagram, char *net, char *nodeslist_received);
 void freeNodeList(node_list **list);
 #endif

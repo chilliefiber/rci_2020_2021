@@ -8,7 +8,7 @@
 
 extern int errno;
 
-int parseNodeListRecursive(char* datagram, node_list **list)
+int parseNodeListRecursive(char* datagram, node_list **list, int *num_nodes)
 {
     int rvalue;
     node_list *this = safeMalloc(sizeof(node_list));
@@ -32,6 +32,7 @@ int parseNodeListRecursive(char* datagram, node_list **list)
     // no início da lista
     // visto que ao entrar nesta função pela primeira vez em cada datagrama
     // NODESLIST, *list == NULL, isto funciona
+    *num_nodes = (*num_nodes) + 1;
     this->next = *list;
     *list = this;
     int ix =0;
@@ -45,7 +46,7 @@ int parseNodeListRecursive(char* datagram, node_list **list)
     // se o próximo caractere for \0, lemos o dgram todo
     // caso contrário, vamos ler mais uma linha
     if (datagram[ix + 1] != '\0')
-        return parseNodeListRecursive(datagram + ix + 1, list);
+        return parseNodeListRecursive(datagram + ix + 1, list, num_nodes);
     
     return NO_ERROR;
 }

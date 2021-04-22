@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <signal.h>
+#include <time.h>
 
 #include "input.h"
 #include "udp_parser.h"
@@ -39,81 +40,16 @@ int main(int argc, char *argv[])
 {
     int errcode, N;
     char *regIP, *regUDP, *IP, *TCP;
-    if(argc < 3 || argc > 6)
-    {
-        printf("Invalid number of arguments!\n");
-        printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
-        exit(EXIT_FAILURE);
-    }
-    else
-    {
-        IP = argv[1];
-        TCP = argv[2];
-        if(!isIP(IP) || !isPort(TCP))
-        {
-            if(!isIP(IP))
-                printf("Invalid IP address! Error in IP argument\n");
-            if(!isPort(TCP))
-                printf("Invalid TCP port! Error in TCP argument\n");
-            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
-            exit(EXIT_FAILURE);
-        }
-    }
+    if(checkEntryArgs(argv, argc, &IP, &TCP, &regIP, &regUDP, &N) == END_EXECUTION) exit(EXIT_FAILURE);
 
-    if(argc == 5 || argc == 6)
-    {
-        regIP = argv[3];
-        regUDP = argv[4];
-        if(!isIP(regIP) || !isPort(regUDP))
-        {
-            if(!isIP(regIP))
-                printf("Invalid regIP address! Error in regIP argument\n");
-            if(!isPort(regUDP))
-                printf("Invalid regUDP port! Error in regUDP argument\n");
-            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
-            exit(EXIT_FAILURE);
-        }
-    }
+    time_t t;
 
-    if(argc == 6 || argc == 4)
-    {
-        if(checkDigit(argv[argc - 1]) == 1)
-        {
-            if ((errcode = sscanf(argv[argc-1], "%d", &N)) == EOF)
-                fprintf(stderr, "Error reading size of cache: %s\n", strerror(errno));
-            // é pouco explícito na man page o que acontece para o caso de devolver 0, assumimos que não mexe no ERRNO
-            else if(!errcode)
-                fprintf(stderr, "Error reading size of cache\n");
-            if (errcode != 1)
-                exit(EXIT_FAILURE);
-            if(N == 0)
-            {
-                printf("Invalid size for cache! Must be able to save at least 1 object!\n");
-                printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
-                exit(EXIT_FAILURE);
-            } 
-        }
-        else
-        {
-            printf("Invalid size for cache!\n");
-            printf("Normal Usage:\n./ndn IP TCP regIP regUDP\n./ndn IP TCP\nOptional Usage:\n./ndn IP TCP regIP regUDP cache_size\n./ndn IP TCP cache_size\n");
-            exit(EXIT_FAILURE);   
-        }
-    }
-    
-    if(argc == 5 || argc == 3) 
-        N = 2;
-
-    if(argc == 3 || argc == 4)
-    {
-        regIP = "193.136.138.142";
-        regUDP = "59000";
-    }
-    
+    srand((unsigned) time(&t));
+        
     network_state = NONODES;
-    node_list *list_of_nodes, *aux_list_of_nodes;
+    node_list *list_of_nodes, *aux_list_of_nodes, *prev_list_of_nodes;
     fd_set rfds;
-    int fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0, we_register_as_single_node;
+    int fd_udp, max_fd, counter, tcp_server_fd, we_are_reg=0, we_register_as_single_node, num_nodes, random_index;
     int external_is_filled, we_used_interest_tmp;
     enum instr instr_code;
     char *user_input, flag, tcp_read_flag;
@@ -1209,7 +1145,8 @@ int main(int argc, char *argv[])
                         // imediatamente após a confirmação de que entrámos no servidor
                         // e portanto não precisamos mais dela
                         list_of_nodes = NULL;
-                        parseNodeListRecursive(list_msg, &list_of_nodes);
+                        num_nodes = 0;
+                        parseNodeListRecursive(list_msg, &list_of_nodes, &num_nodes);
                         external = safeMalloc(sizeof(viz));
                         external->next_av_ix = 0;
                         // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
@@ -1220,9 +1157,19 @@ int main(int argc, char *argv[])
                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
                         }
                         errcode = ERROR;
-                        aux_list_of_nodes = list_of_nodes;
-                        while (aux_list_of_nodes)
+                        
+                        // neste caso havia nós na lista
+                        if (list_of_nodes)
                         {
+                            // escolher um nó da lista pseudo-aleatório 
+                            aux_list_of_nodes = list_of_nodes;
+                            random_index = rand() % num_nodes;
+                            prev_list_of_nodes = NULL;
+                            for (int i = 0; i < random_index; i++)
+                            {
+                                prev_list_of_nodes = aux_list_of_nodes;
+                                aux_list_of_nodes = aux_list_of_nodes->next;
+                            }
                             external->fd = socket(AF_INET, SOCK_STREAM, 0);
                             if (external->fd == -1){
                                 fputs("Error making a TCP socket for external neighbour after receiving nodes list!\n", stderr);
@@ -1252,14 +1199,64 @@ int main(int argc, char *argv[])
                                 else
                                     errcode = ERROR;
                             }
-                            // neste caso o errcode será NO_ERROR se tanto o connect como ambos os writes funcionaram
-                            if (errcode == NO_ERROR)
-                                break;
-                            // segundo a manpage do connect, se falhar o connect temos de dar close da socket
-                            // caso falhe algum dos write também vamos fechar a socket
-                            else if (close(external->fd) == -1)
-                                fprintf(stderr, "Error closing file descriptor for unavailable external neighbour: %s\n", strerror(errno));
-                            aux_list_of_nodes = aux_list_of_nodes->next;
+                            // neste caso houve um erro ao tentar ligar ao nó escolhido aleatoriamente
+                            if (errcode == ERROR)
+                            {
+                                if (close(external->fd) == -1)
+                                    fprintf(stderr, "Error closing file descriptor for unavailable randomly chosen external neighbour: %s\n", strerror(errno));
+                                // retiramos o nó da lista, para não o tentarmos de novo
+                                
+                                // caso o nó fosse o primeiro, simplesmente começamos a iterar a partir do segundo
+                                if (!prev_list_of_nodes)
+                                    aux_list_of_nodes = list_of_nodes->next;
+                                // caso contrário, removemos mesmo e limpamos a memória
+                                else
+                                {
+                                    prev_list_of_nodes->next = aux_list_of_nodes->next;
+                                    free(aux_list_of_nodes);
+                                    aux_list_of_nodes = list_of_nodes; // começamos a tentar do início da lista criada, que é o fim da enviada
+                                }
+                                while (aux_list_of_nodes)
+                                {
+                                    external->fd = socket(AF_INET, SOCK_STREAM, 0);
+                                    if (external->fd == -1){
+                                        fputs("Error making a TCP socket for external neighbour after receiving nodes list!\n", stderr);
+                                        fprintf(stderr, "error: %s\n", strerror(errno));
+                                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
+                                    }
+                                    errcode = connectTCP(aux_list_of_nodes->IP, aux_list_of_nodes->port, external->fd, 
+                                            "Error getting address info for external node in JOIN\n", "Error connecting to external node in JOIN\n");
+                                    // neste caso o errcode é NO_ERROR se o connect funcionou
+                                    // tentamos enviar as 2 mensagens por TCP que temos de enviar
+                                    // se alguma delas falhar no envio, consideramos que não nos conseguimos ligar e tentamo-nos ligar ao seguinte nó da lista recebida
+                                    if (errcode == NO_ERROR)
+                                    {
+                                        if (writeTCP(external->fd, strlen(message_buffer), message_buffer))
+                                        {
+                                            errcode = snprintf(message_buffer, 150, "ADVERTISE %s\n",self.id);  
+                                            if (message_buffer == NULL || errcode < 0 || errcode >= 150)
+                                            {
+                                                fprintf(stderr, "error in ADVERTISE TCP message creation\n");
+                                                errcode = ERROR;
+                                            }
+                                            else
+                                                errcode = NO_ERROR;
+                                            if (!writeTCP(external->fd, strlen(message_buffer), message_buffer))
+                                                errcode = ERROR;
+                                        }
+                                        else
+                                            errcode = ERROR;
+                                    }
+                                    // neste caso o errcode será NO_ERROR se tanto o connect como ambos os writes funcionaram
+                                    if (errcode == NO_ERROR)
+                                        break;
+                                    // segundo a manpage do connect, se falhar o connect temos de dar close da socket
+                                    // caso falhe algum dos write também vamos fechar a socket
+                                    else if (close(external->fd) == -1)
+                                        fprintf(stderr, "Error closing file descriptor for unavailable external neighbour: %s\n", strerror(errno));
+                                    aux_list_of_nodes = aux_list_of_nodes->next;
+                                }
+                            }
                         }
                         // neste caso não nos conseguimos ligar a nenhum dos nós listados no servidor de nomes
                         // vamos entrar na rede como nó único, assumindo que os outros falharam de algum modo
@@ -1279,8 +1276,8 @@ int main(int argc, char *argv[])
                             // aqui devíamos colocar um estado novo em que ficamos à espera do extern
 
                             // acabar de preencher a informação do external
-                            strncpy(external->IP, list_of_nodes->IP, NI_MAXHOST);
-                            strncpy(external->port, list_of_nodes->port, NI_MAXSERV);
+                            strncpy(external->IP, aux_list_of_nodes->IP, NI_MAXHOST);
+                            strncpy(external->port, aux_list_of_nodes->port, NI_MAXSERV);
                             external_is_filled = 1;
                             we_register_as_single_node = 0;
                         }
@@ -1428,6 +1425,23 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
+            }
+            
+
+            // versão extra do JOIN - permite criar a rede e executar a funcionalidade sem servidor UDP ativo
+            // simplesmente se coloca 
+            else if(instr_code == JOIN_SERVER_DOWN && network_state == NONODES)
+            {
+                network_state = ONENODE;
+                we_are_reg = 1;
+
+                if(sscanf(user_input,"%s %s",self.net,self.id) != 2)
+                {
+                    printf("Error in sscanf JOIN_LINK\n");
+                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self);
+                }
+                strncpy(self.IP, argv[1], NI_MAXHOST);
+                strncpy(self.port, argv[2], NI_MAXSERV);
             }
             else if (instr_code == LEAVE && network_state != NONODES)
             {

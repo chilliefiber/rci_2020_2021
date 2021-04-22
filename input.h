@@ -67,4 +67,6 @@ int isName(char name[]);
  */
 int countblankSpace(char terminal[]);
 
+
+int checkEntryArgs(char **argv, int argc, char **IP, char **TCP, char **regIP, char **regUDP, int *N);
 #endif

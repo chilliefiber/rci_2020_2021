@@ -99,7 +99,7 @@ int safeTCPSocket(int* fd)
 int connectTCP(char *ip, char* port, int fd, char *addrinfo_error_msg, char *connect_error_msg)
 {
     struct addrinfo hints, *res;
-    size_t n;
+    int n;
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
