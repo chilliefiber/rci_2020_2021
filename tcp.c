@@ -23,23 +23,24 @@ int writeTCP(int fd, ssize_t nleft, char *buffer)
     return NO_ERROR;
 }
 
-
 messages* messagesAlloc(void)
 {
-  messages* new = safeMalloc(sizeof(messages));
+  messages* new = malloc(sizeof(messages));
   if (!new)
       return NULL;
-  new->message = safeCalloc(N_MAX+1, sizeof(char));
+  new->message = calloc(N_MAX+1, sizeof(char));
   if (!new->message)
       return NULL;
   new->next = NULL;
   return new;
 }
 
-messages *processReadTCP(viz *sender, ssize_t start_ix)
+messages *processReadTCP(viz *sender, ssize_t start_ix, int *errcode)
 {
     // este é o caso em que a função é chamada pelo main
     messages* new = messagesAlloc();
+    if(new == NULL)
+    *errcode = END_EXECUTION;
     char message_end = 0;
     ssize_t ix;
     for (ix = start_ix; ix < sender->next_av_ix; ix++)
@@ -54,7 +55,7 @@ messages *processReadTCP(viz *sender, ssize_t start_ix)
             // se ainda há mais texto para lá do desta mensagem
             if (ix + 1 != sender->next_av_ix)
                 // começar a proxima mensagem a ler a partir do proximo indice
-                new->next = processReadTCP(sender, ix + 1);
+                new->next = processReadTCP(sender, ix + 1, errcode);
             // se estávamos no ultimo indice disponivel
             // nao alocamos outra estrutura, nem limpamos memória
             // reinicializamos apenas o indice da buffer
@@ -130,4 +131,15 @@ void freeMessage(messages *msg)
 {
     free(msg->message);
     free(msg);
+}
+
+void freeMessageList(messages **msg_list)
+{
+    messages *msg_aux;
+    while (*msg_list != NULL)
+    {
+        msg_aux = *msg_list;
+        *msg_list = (*msg_list)->next;
+        freeMessage(msg_aux);
+    }
 }

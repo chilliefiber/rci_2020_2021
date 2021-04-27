@@ -27,12 +27,12 @@ void helpMenu(void)
 
 void warnOfTrashReceived(char* warning, char *trash)
 {
-    fputs(warning, stdout);
-    fputs("This is the trash\n", stdout);
-    fputs(trash, stdout);
-    fputs("\n That was it\n", stdout);
+    fputs(warning, stderr);
+    fputs("This is the received message\n", stderr);
+    fputs(trash, stderr);
+    fputs("\n That was it\n", stderr);
 }
-char* getParam(char *input)
+char* getParam(char *input, int *errcode)
 {
   // ignorar leading whitespace
   while (isspace(*input)) input++;
@@ -41,20 +41,26 @@ char* getParam(char *input)
   // avançar os espaços entre o comando e o primeiro parâmetro
   while (isspace(*input)) input++;
   // copiar parametros para string nova
-  char *params = safeMalloc(strlen(input) + 1);
+  char *params = malloc(strlen(input) + 1);
+  if(params == NULL)
+  {  
+      *errcode = END_EXECUTION;
+      return NULL;
+  }
   strcpy(params, input);
+  *errcode = NO_ERROR;
   return params;
 }
 
-char *readCommand(enum instr *instr_code)
+char *readCommand(enum instr *instr_code, int *errcode)
 {
 	char terminal[128], command[14], bootIP[NI_MAXHOST], bootTCP[NI_MAXSERV], second[64], id[64];
-    	memset(terminal, 0, 128);
-    	memset(command, 0, 14);
-    	memset(bootIP, 0, NI_MAXHOST);
-    	memset(bootTCP, 0, NI_MAXSERV);
-    	memset(second, 0, 64);
-    	memset(id, 0, 64);
+    memset(terminal, 0, 128);
+    memset(command, 0, 14);
+    memset(bootIP, 0, NI_MAXHOST);
+    memset(bootTCP, 0, NI_MAXSERV);
+    memset(second, 0, 64);
+    memset(id, 0, 64);
 	int size_input = 0;
 	
 	fgets(terminal,128,stdin);
@@ -72,15 +78,20 @@ char *readCommand(enum instr *instr_code)
 		if(size_input == 3 && (countblankSpace(terminal) == 2))
 		{
 		    *instr_code = JOIN_ID;
-			return getParam(terminal);
+			return getParam(terminal,errcode);
 		}
+		else if(size_input == 4 && (countblankSpace(terminal) == 3))
+	    {
+            *instr_code = JOIN_SERVER_DOWN;
+			return getParam(terminal,errcode);		
+	    }
 		else if(size_input == 5 && (countblankSpace(terminal) == 4))
 		{
 			if(isIP(bootIP) == 1 && isPort(bootTCP) == 1)
 			{
 				*instr_code = JOIN_LINK;
 				
-				return getParam(terminal);
+				return getParam(terminal,errcode);
 			}
 			if(isIP(bootIP) != 1)
 			{
@@ -102,7 +113,7 @@ char *readCommand(enum instr *instr_code)
 		{
 			*instr_code = CREATE;
 		
-			return getParam(terminal);
+			return getParam(terminal,errcode);
 		}
 		else
 		{
@@ -117,7 +128,7 @@ char *readCommand(enum instr *instr_code)
 			{
 				*instr_code = GET;
 				
-				return getParam(terminal);
+				return getParam(terminal,errcode);
 			}
 			else
 			{

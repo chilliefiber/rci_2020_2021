@@ -33,8 +33,9 @@ typedef struct internals{
  * addtoList: função que adiciona um interno à lista de vizinhos internos (inserção pelo topo da lista)
  * \param **int_neighbours: duplo ponteiro para o topo da lista de vizinhos internos
  * \param *new: ponteiro para uma variável da estrutura viz, que conterá a informação do novo vizinho que se vai adicionar à lista
+ * \retorna NO_ERROR se não houver erro e END_EXECUTION se houver erro na alocação dinâmica de memória
  */
-void addToList(internals **int_neighbours, viz *new);
+int addToList(internals **int_neighbours, viz *new);
 
 /**
  * freeViz: função que liberta a memória alocada por uma variável do tipo viz

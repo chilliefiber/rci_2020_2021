@@ -10,16 +10,6 @@
 #include <stddef.h>
 #include <netdb.h>
 
-void* safeMalloc(size_t size);
-
-/**
- * \param fd: fd do client UDP
- * \param ip: ip do servidor UDP
- * \param port: porto do cliente UDP
- * \param text: texto que queremos enviar no datagrama
- * \param addrinfo_error_msg: mensagem de erro para o utilizador na chamada ao getaddrinfo
- * \return ERROR se houve um erro no processo de envio, NO_ERROR caso contrário
- */
 int sendUDP(int fd, char* ip, char* port, char* text, char* addrinfo_error_msg, char* send_error_msg);
 /**
  * \param ip: endereço ao qual nos queremos ligar
@@ -30,8 +20,8 @@ int sendUDP(int fd, char* ip, char* port, char* text, char* addrinfo_error_msg, 
  * \return 0 em caso de algum erro, 1 caso tudo funcione
  */
 int safeGetAddrInfo(char* ip, char* port, struct addrinfo *hints, struct addrinfo **res, char* error_msg);
-void* safeCalloc(size_t nmemb, size_t size);
-void safeRecvFrom(int fd, char *dgram, size_t len);
+
+int safeRecvFrom(int fd, char *dgram, size_t len);
 int safeTCPSocket(int* fd);
 
 /**

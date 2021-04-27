@@ -6,18 +6,23 @@
 #include "routing.h"
 #include "errcheck.h"
 
-tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd)
+int createinsertTabEntry(tab_entry **first_entry, char *id_dst, int fd)
 {
-    tab_entry *tmp = first_entry;
-    tab_entry *new_entry = safeMalloc(sizeof(tab_entry));
+    tab_entry *tmp = *first_entry;
+    tab_entry *new_entry = malloc(sizeof(tab_entry));
+    if(new_entry == NULL)
+    return END_EXECUTION;
 
-    new_entry->id_dest = safeMalloc(strlen(id_dst)+1);
+    new_entry->id_dest = malloc(strlen(id_dst)+1);
+    if(new_entry->id_dest == NULL)
+    return END_EXECUTION;
+    
     strcpy(new_entry->id_dest, id_dst);
     new_entry->fd_sock = fd;
 
-    if(first_entry == NULL)
+    if(*first_entry == NULL)
     {
-        first_entry = new_entry;
+        *first_entry = new_entry;
         new_entry->next = NULL;
     }
     else
@@ -30,7 +35,7 @@ tab_entry *createinsertTabEntry(tab_entry *first_entry, char *id_dst, int fd)
         new_entry->next = NULL;
     }
 
-    return first_entry;
+    return NO_ERROR;
 }
 
 void deleteTabEntryid(tab_entry **first_entry, char *id_out)

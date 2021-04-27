@@ -22,16 +22,18 @@ void warnOfTrashReceived(char* warning, char *trash);
 /**
  * getParam: função que processa os parâmetros introduzidos após o comando/intrução (join, create, get)
  * \param *input: ponteiro para a string input
+ * \param *errcode: ponteiro para o int errcode (verificação de erros)
  * \retorna um ponteiro para a string que conterá os parâmetros introduzidos à frente da instrução
  */
-char* getParam(char *input);
+char* getParam(char *input, int *errcode);
 
 /**
  * readCommand: função que lê do terminal (pelo stdin) o comando introduzido pelo utilizador
  * \param *instr_code: ponteiro para uma variável do tipo instr
+ * \param *errcode: ponteiro para o int errcode (verificação de erros)
  * \retorna um ponteiro para a string que conterá os parâmetros introduzidos
  */
-char *readCommand(enum instr *instr_code);
+char *readCommand(enum instr *instr_code, int *errcode);
 
 /**
  * checkDigit: função que recebe uma string e verifica se esta é só composta unicamente por digitos

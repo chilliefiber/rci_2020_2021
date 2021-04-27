@@ -29,9 +29,10 @@ int writeTCP(int fd, ssize_t nleft, char *buffer);
  */
 messages* messagesAlloc(void);
 
-messages *processReadTCP(viz *sender, ssize_t start_ix);
+messages *processReadTCP(viz *sender, ssize_t start_ix, int *errcode);
 
 
 char readTCP(viz* sender);
 void freeMessage(messages *msg);
+void freeMessageList(messages **msg_list);
 #endif 

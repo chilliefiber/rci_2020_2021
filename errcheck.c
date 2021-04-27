@@ -8,31 +8,6 @@
 #include "errcheck.h" 
 
 extern int errno;
-void* safeMalloc(size_t size)
-{
-    // alocar memória de uma variável do tipo desejado
-    // mostrar mensagem de erro caso tal não seja conseguido
-    void* p = malloc(size);
-    if (p == NULL){
-        fputs("Memory error - malloc\n", stdout);
-        fprintf(stderr, "error: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    return p;
-}
-
-void* safeCalloc(size_t nmemb, size_t size)
-{
-    // alocar memória de uma variável do tipo desejado
-    // mostrar mensagem de erro caso tal não seja conseguido
-    void* p = calloc(nmemb, size);
-    if (p == NULL){
-        fputs("Memory error - calloc\n", stdout);
-        fprintf(stderr, "error: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    return p;
-}
 
 int sendUDP(int fd, char* ip, char* port, char* text, char* addrinfo_error_msg, char* send_error_msg)
 {
@@ -65,7 +40,7 @@ int safeGetAddrInfo(char* ip, char* port, struct addrinfo *hints, struct addrinf
 }
 
 // aqui perguntar ao prof se devemos usar os tipos de argumentos do recvfrom!!!
-void safeRecvFrom(int fd, char *dgram, size_t len)
+int safeRecvFrom(int fd, char *dgram, size_t len)
 {
     int n;
     struct sockaddr addr;
@@ -76,9 +51,10 @@ void safeRecvFrom(int fd, char *dgram, size_t len)
     {
         fputs("Error in recvfrom!\n", stderr);
         fprintf(stderr, "error: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        return END_EXECUTION;
     }
     dgram[n] = '\0';
+    return NO_ERROR;
 }
 
 // aqui talvez meter uma mensagem de erro individualizada como argumento para sabermos onde no programa crashou
@@ -115,4 +91,3 @@ int connectTCP(char *ip, char* port, int fd, char *addrinfo_error_msg, char *con
     freeaddrinfo(res);
     return NO_ERROR;
 }
-

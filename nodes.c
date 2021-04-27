@@ -6,12 +6,17 @@
 #include "nodes.h"
 #include "errcheck.h"
 
-void addToList(internals **int_neighbours, viz *new)
+int addToList(internals **int_neighbours, viz *new)
 {
     internals *aux = *int_neighbours;
-    *int_neighbours = safeMalloc(sizeof(internals));
+    *int_neighbours = malloc(sizeof(internals));
+    if(*int_neighbours == NULL)
+    return END_EXECUTION;
+    
     (*int_neighbours)->this = new;
     (*int_neighbours)->next = aux;
+    
+    return NO_ERROR;
 }
 
 void freeViz(viz **v)
