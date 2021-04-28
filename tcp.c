@@ -78,7 +78,6 @@ messages *processReadTCP(viz *sender, ssize_t start_ix, int *errcode)
 
 char readTCP(viz* sender)
 {
-    printf("Estamos a ler por TCP\n");
     ssize_t n_read, i;
     char  message_end=0;
     // N_MAX é o limite superior de uma mensagem
@@ -99,31 +98,18 @@ char readTCP(viz* sender)
         }
         // adicionamos o valor de caracteres lidos agora ao lido no total
         sender->next_av_ix += n_read;
-        printf("Lemos coisas por TCP\n");
     }
     else if (n_read == -1)
-    {
-        printf("Houve um erro na leitura\n");
         return MSG_READ_ERROR;
-    }
     else if (!n_read)
-    {
-        printf("O tipo fechou a conexão\n");
         return MSG_CLOSED;
-    }
     // se já lemos N_MAX caracteres e ainda não
     // recebemos uma \n, está a ocorrer um erro
     // da parte do sender
     if (sender->next_av_ix == N_MAX && !message_end)
-    {
-        printf("O gajo enviou dados a mais\n");
         return MSG_FORMAT_ERROR;
-    }
-    if (message_end){
-        printf("Recebemos uma mensagem completa no readTCP\n");
+    if (message_end)
         return MSG_FINISH;
-    }
-    printf("Recebemos uma mensagem parcial por TCP\n");
     return MSG_PARTIAL;
 }
 

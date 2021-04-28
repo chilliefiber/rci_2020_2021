@@ -66,9 +66,9 @@ char *readCommand(enum instr *instr_code, int *errcode)
 	fgets(terminal,128,stdin);
 	size_input = sscanf(terminal,"%s %s %s %s %s", command, second, id, bootIP, bootTCP);
 	*instr_code = ERR;
-	
+    *errcode = NO_ERROR;
 	if(size_input<=0)
-	{
+	{ 
 		printf("Error in command input!\n");
 		return NULL;
 	}

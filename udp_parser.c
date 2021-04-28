@@ -9,9 +9,9 @@
 #include "nodes.h"
 #include "tcp.h"
 
-#define OK_READ 0
-#define TIMER_EXPIRED 1
-#define DGRAM_RECEIVED 2
+#define OK_READ 5
+#define TIMER_EXPIRED 6
+#define DGRAM_RECEIVED 7
 extern int errno;
 
 int parseNodeListRecursive(char* datagram, node_list **list, int *num_nodes)
@@ -143,9 +143,7 @@ int sendAndWait(int fd_udp, struct timeval *tv, char* send_error_msg, char *send
     int counter;
     // enviar mensagem ao servidor
     if (sendUDP(fd_udp, send_IP, send_UDP, message_buffer, "Error getting address information for UDP server socket\n", send_error_msg) == ERROR)
-    {
         return NON_FATAL_ERROR;
-    }
     // esperar por resposta, ou timeout
     FD_SET(fd_udp, &rfds);
     counter = select(fd_udp+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, tv);
@@ -213,7 +211,6 @@ int unreg(no *self, char *send_IP, char *send_UDP)
     char dgram[1000];
     int errcode = snprintf(dgram, 1000, "UNREG %s %s %s", self->net, self->IP, self->port);  
     if (errcode < 0)
-
     {
         fprintf(stderr, "error in UNREG UDP message creation: snprintf returned a negative value\n");
         return END_EXECUTION;
@@ -232,9 +229,8 @@ int unreg(no *self, char *send_IP, char *send_UDP)
     return NO_ERROR;
 }
 
-int getNodesList(char *self_net, char *send_IP, char *send_UDP)
+int getNodesList(char *self_net, char *send_IP, char *send_UDP, char *dgram)
 {
-    char dgram[1000];
     // criar string para enviar o pedido de nós
     int errcode = snprintf(dgram, 1000, "NODES %s", self_net);  
     if (errcode < 0)
@@ -254,9 +250,8 @@ int getNodesList(char *self_net, char *send_IP, char *send_UDP)
     return NO_ERROR;
 }
 
-int setListedNodeAsExternal(viz *external, node_list *aux_list_of_nodes, no *self)
+int setListedNodeAsExternal(viz *external, node_list *aux_list_of_nodes, no *self, char *message_buffer)
 {
-    char message_buffer[150];
     external->fd = socket(AF_INET, SOCK_STREAM, 0);
     if (external->fd == -1){
         fputs("Error making a TCP socket for external neighbour after receiving nodes list!\n", stderr);
@@ -303,7 +298,7 @@ int setListedNodeAsExternal(viz *external, node_list *aux_list_of_nodes, no *sel
     return NO_ERROR;
 }
 
-int chooseExternalFromList(node_list *list_of_nodes, int num_nodes, viz *external, no *self)
+int chooseExternalFromList(node_list *list_of_nodes, int num_nodes, viz *external, no *self, char *message_buffer)
 {
     // escolher um nó da lista pseudo-aleatório 
     node_list *aux_list_of_nodes = list_of_nodes;
@@ -315,9 +310,9 @@ int chooseExternalFromList(node_list *list_of_nodes, int num_nodes, viz *externa
         aux_list_of_nodes = aux_list_of_nodes->next;
     }
     // tentar ligar ao nó selecionado
-    errcode = setListedNodeAsExternal(external, aux_list_of_nodes, self);
+    errcode = setListedNodeAsExternal(external, aux_list_of_nodes, self, message_buffer);
 
-    // neste caso houve um erro ao tentar ligar ao nó escolhido aleatoriamente, ou a fazer write
+    // neste caso houve um erro que não necessita o encerro do programa ao tentar ligar ao nó escolhido aleatoriamente, ou a fazer write
     if (errcode == ERROR)
     {
         // retiramos o nó da lista, para não o tentarmos de novo
@@ -335,10 +330,10 @@ int chooseExternalFromList(node_list *list_of_nodes, int num_nodes, viz *externa
         // não estão a aceitar ligações por TCP
         while (aux_list_of_nodes)
         {
-            errcode = setListedNodeAsExternal(external, aux_list_of_nodes, self);
+            errcode = setListedNodeAsExternal(external, aux_list_of_nodes, self, message_buffer);
             // neste caso o errcode será NO_ERROR se tanto o connect como ambos os writes funcionaram
             // já estamos ligados ao nosso vizinho externo e já lhe enviámos o ADVERTISE e o NEW
-            if (errcode == NO_ERROR)
+            if (errcode == NO_ERROR || errcode == END_EXECUTION)
                 break;
             // continuamos a iterar pela lista, de modo a tentarmos outros nós listados
             aux_list_of_nodes = aux_list_of_nodes->next;
@@ -349,7 +344,9 @@ int chooseExternalFromList(node_list *list_of_nodes, int num_nodes, viz *externa
     {
         strncpy((external)->IP, aux_list_of_nodes->IP, NI_MAXHOST);
         strncpy((external)->port, aux_list_of_nodes->port, NI_MAXSERV);
+        return NO_ERROR;
     }
+    return errcode;
 }
 
 int setupExternal(char *list_msg, viz **external, no *self)
@@ -371,6 +368,7 @@ int setupExternal(char *list_msg, viz **external, no *self)
         fprintf(stderr, "Malloc error allocating memory for external neighbou\n");
         return END_EXECUTION;
     }
+    (*external)->next_av_ix = 0;
     // preparar mensagem new, com a informação do IP/porto do nosso servidor TCP 
     errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self->IP, self->port);  
     if (errcode < 0)
@@ -388,9 +386,7 @@ int setupExternal(char *list_msg, viz **external, no *self)
     errcode = ERROR;
     // se a lista recebida estava bem formatada (já havia nós na rede selecionada)
     if (list_of_nodes)
-    {
-        chooseExternalFromList(list_of_nodes, num_nodes, *external, self);
-    }
+        errcode = chooseExternalFromList(list_of_nodes, num_nodes, *external, self, message_buffer);
     // neste caso não nos conseguimos ligar a nenhum dos nós listados no servidor de nomes
     // vamos entrar na rede como nó único, assumindo que os outros falharam de algum modo
     // ou estão no processo
@@ -402,6 +398,7 @@ int setupExternal(char *list_msg, viz **external, no *self)
     }  
     // clear list
     freeNodeList(&list_of_nodes);
+    return errcode;
 }
 
 int reg(no *self, char *send_IP, char *send_UDP)
@@ -422,7 +419,17 @@ int reg(no *self, char *send_IP, char *send_UDP)
 
     errcode = getDgram("error in REG UDP message send\n", send_IP, send_UDP, dgram);
     if (errcode == DGRAM_RECEIVED)
+    {
         printf("We received the confirmation of registration from the server\n");
+        return NO_ERROR;
+    }
+    if (errcode == NON_FATAL_ERROR)
+    {
+        printf("There was a problem registering in the server. We will proceed execution as normal\n");
+        return NO_ERROR; // coloco NO_ERROR apesar de ter havido um erro porque para a função main este erro é irrelevante. Notificamos o utilizador
+        // do problema com o servidor e seguimos tudo normalmente
+    }
+    return errcode; // neste caso ERRCODE será END_EXECUTION
 }
 /*
 node_list *parseNodelist(char* datagram, int *num_nodes)

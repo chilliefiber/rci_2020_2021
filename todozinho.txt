@@ -34,3 +34,8 @@ FUNCIONALIDADE EXTRA
 -Timer fantastico???
 
 Reler tudo
+
+A FAZER
+breaks no main que deviam ser continue (caso contrário quebram o select) R: parece feito
+leave passar a int para podermos chamar o safeExit se falhar o unreg
+ler tudo, verificar saidas do readTCP
