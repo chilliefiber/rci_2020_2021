@@ -40,7 +40,11 @@ messages *processReadTCP(viz *sender, ssize_t start_ix, int *errcode)
     // este é o caso em que a função é chamada pelo main
     messages* new = messagesAlloc();
     if(new == NULL)
-    *errcode = END_EXECUTION;
+    {
+        *errcode = END_EXECUTION;
+        return NULL;
+    }
+
     char message_end = 0;
     ssize_t ix;
     for (ix = start_ix; ix < sender->next_av_ix; ix++)
