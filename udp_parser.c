@@ -140,6 +140,7 @@ void freeNodeList(node_list **list)
 int sendAndWait(int fd_udp, struct timeval *tv, char* send_error_msg, char *send_IP, char *send_UDP, char *message_buffer)
 {
     fd_set rfds;
+    FD_ZERO(&rfds);
     int counter;
     // enviar mensagem ao servidor
     if (sendUDP(fd_udp, send_IP, send_UDP, message_buffer, "Error getting address information for UDP server socket\n", send_error_msg) == ERROR)
@@ -225,7 +226,10 @@ int unreg(no *self, char *send_IP, char *send_UDP)
     //
     if ((errcode = getDgram("error in UNREG UDP message send\n", send_IP, send_UDP, dgram)) != DGRAM_RECEIVED)
         return errcode;
-
+    if (!strcmp(dgram, "OKUNREG"))
+        printf("We received the confirmation of unregistration from the server\n");
+    else
+        fprintf(stderr, "We received gibberish via UDP\n");
     return NO_ERROR;
 }
 
@@ -420,7 +424,10 @@ int reg(no *self, char *send_IP, char *send_UDP)
     errcode = getDgram("error in REG UDP message send\n", send_IP, send_UDP, dgram);
     if (errcode == DGRAM_RECEIVED)
     {
-        printf("We received the confirmation of registration from the server\n");
+        if (!strcmp(dgram, "OKREG"))
+            printf("We received the confirmation of registration from the server\n");
+        else
+            fprintf(stderr, "We received gibberish via UDP\n");
         return NO_ERROR;
     }
     if (errcode == NON_FATAL_ERROR)

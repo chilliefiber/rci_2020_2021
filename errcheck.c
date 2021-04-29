@@ -39,7 +39,6 @@ int safeGetAddrInfo(char* ip, char* port, struct addrinfo *hints, struct addrinf
     return NO_ERROR;
 }
 
-// aqui perguntar ao prof se devemos usar os tipos de argumentos do recvfrom!!!
 int safeRecvFrom(int fd, char *dgram, size_t len)
 {
     int n;
