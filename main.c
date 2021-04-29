@@ -1918,17 +1918,7 @@ void leave(int *flag_one_node, int *we_are_reg, char *regIP, char *regUDP, viz *
     *end = 0;
     *flag_one_node = 0;
     *we_are_reg = 0;
-    // terminar a sessão TCP com o vizinho externo
-    freeViz(external);
-    // terminar todas as conexões com vizinhos internos
-    // e limpar a memória da lista
-    freeIntNeighbours(int_neighbours);
-    freeSelf(self);
-    FreeTabExp(first_entry);
-    FreeObjectList(head);
-    clearCache(cache,*n_obj);
-    FreeInterestList(first_interest);
-    *n_obj = 0;
+    
     if (network_state != NONODES)
     {
         // neste caso não temos de verificar se o UNREG retornou LEAVE_NETWORK visto que já estamos
@@ -1940,6 +1930,17 @@ void leave(int *flag_one_node, int *we_are_reg, char *regIP, char *regUDP, viz *
             *end = 1;
         }
     }
+    // terminar a sessão TCP com o vizinho externo
+    freeViz(external);
+    // terminar todas as conexões com vizinhos internos
+    // e limpar a memória da lista
+    freeIntNeighbours(int_neighbours);
+    freeSelf(self);
+    FreeTabExp(first_entry);
+    FreeObjectList(head);
+    clearCache(cache,*n_obj);
+    FreeInterestList(first_interest);
+    *n_obj = 0;
     // indicar que não estamos ligados a qualquer rede
     network_state = NONODES;
 }
