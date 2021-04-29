@@ -587,6 +587,7 @@ int main(int argc, char *argv[])
                                     if(saveinCache(cache, arg1, &n_obj, N) == END_EXECUTION)
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                                 }
+                                printf("Received DATA %s\n", interest_aux->obj);
                                 deleteInterest(&first_interest, arg1, interest_aux->fd);
                             }
                             // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
@@ -647,6 +648,7 @@ int main(int argc, char *argv[])
                             {
                                 interest_tmp = interest_aux->next;
                                 we_used_interest_tmp = 1;
+                                printf("Received NODATA %s\n", interest_aux->obj);
                                 deleteInterest(&first_interest, arg1, interest_aux->fd);
                             }
                             // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
@@ -952,6 +954,7 @@ int main(int argc, char *argv[])
                                         if(saveinCache(cache, arg1, &n_obj, N) == END_EXECUTION)
                                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                                     }
+                                    printf("Received DATA %s\n", interest_aux->obj);
                                     deleteInterest(&first_interest, arg1, interest_aux->fd);
                                 }
                                 // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
@@ -1020,6 +1023,7 @@ int main(int argc, char *argv[])
                                 {
                                     interest_tmp = interest_aux->next;
                                     we_used_interest_tmp = 1;
+                                    printf("Received NODATA %s\n", interest_aux->obj);
                                     deleteInterest(&first_interest, arg1, interest_aux->fd);
                                 }
                                 // se verificarmos que um pedido para esse objeto tinha um fd diferente de -1 significa que foi dum vizinho nosso
