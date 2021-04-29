@@ -10,7 +10,6 @@
 #include <stdio.h> // depois tirar este
 int writeTCP(int fd, ssize_t nleft, char *buffer)
 {
-    fputs( "We're writing shit through TCP mudafucka\n",stdout);
     ssize_t nwritten;
 
     while(nleft>0){
