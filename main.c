@@ -1108,7 +1108,10 @@ int main(int argc, char *argv[])
 
             if (instr_code == JOIN_ID && network_state == NONODES)
             {
+                strncpy(backup->IP, IP, NI_MAXHOST);
+                strncpy(backup->port, TCP, NI_MAXSERV);
                 we_are_reg = 0;
+                flag_one_node = 0;
                 memset(net, 0, 64);
                 memset(ident, 0, 64);
                 self.net = NULL;
@@ -1236,11 +1239,14 @@ int main(int argc, char *argv[])
             }
             else if (instr_code == JOIN_LINK && network_state == NONODES)
             {
+                strncpy(backup->IP, IP, NI_MAXHOST);
+                strncpy(backup->port, TCP, NI_MAXSERV);
                 memset(net, 0, 64);
                 memset(ident, 0, 64);
                 self.net = NULL;
                 self.id = NULL;
                 we_are_reg = 0;
+                flag_one_node = 0;
                 // esta condição em princípio nunca será necessária
                 // visto que quando iniciamos o programa o external é colocado a NULL
                 // e quando fazemos LEAVE também. Portanto temos sempre de alocar memória
@@ -1340,6 +1346,8 @@ int main(int argc, char *argv[])
             // simplesmente se coloca à espera de ligações TCP
             else if(instr_code == JOIN_SERVER_DOWN && network_state == NONODES)
             {
+                strncpy(backup->IP, IP, NI_MAXHOST);
+                strncpy(backup->port, TCP, NI_MAXSERV);
                 we_are_reg = 1; // apenas para não enviarmos depois o REG. Isto não vai causar conflitos
                 // porque apesar de enviarmos o UNREG, o servidor aceita isso
                 memset(net, 0, 64);
@@ -1348,6 +1356,7 @@ int main(int argc, char *argv[])
                 self.net = NULL;
                 self.id = NULL;
                 external_is_filled = 0;     
+                flag_one_node = 0;
                 if(sscanf(user_input,"%s %s %s", net, ident, lixo) != 3)
                 {
                     printf("Error in sscanf JOIN_SERVDOWN\n");

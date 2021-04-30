@@ -39,3 +39,6 @@ A FAZER
 breaks no main que deviam ser continue (caso contrário quebram o select) R: parece feito
 leave passar a int para podermos chamar o safeExit se falhar o unreg
 ler tudo, verificar saidas do readTCP
+so ter o servidor TCP quando estamos ligados a uma rede, MAS antes disso testar com um servidor desligado de rede e ligarmo nos a ele
+corrigir bug que apareceu e esta no outro ficheiro
+ver porque é que nao acontece bug quando nunca estivemos ONENODE e se ligam a nos com o mesmo id
