@@ -56,4 +56,11 @@ int safeTCPSocket(int* fd);
  * \return ERROR em caso de algum erro, NO_ERROR caso tudo funcione
  */
 int connectTCP(char *ip, char* port, int fd, char *addrinfo_error_msg, char *connect_error_msg);
+
+/**
+ * \param tcp_server_fd: inteiro que vai ficar associado ao fd do servidor TCP
+ * \param TCP porto TCP do servidor
+ * \return ERROR em caso de algum erro, NO_ERROR caso tudo funcione
+ */
+int createTCPServer(int *tcp_server_fd, char *TCP);
 #endif

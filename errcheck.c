@@ -90,3 +90,32 @@ int connectTCP(char *ip, char* port, int fd, char *addrinfo_error_msg, char *con
     freeaddrinfo(res);
     return NO_ERROR;
 }
+
+int createTCPServer(int *tcp_server_fd, char *TCP)
+{
+    int errcode = safeTCPSocket(tcp_server_fd);
+    if (errcode == ERROR)
+        return ERROR;
+    struct addrinfo hints, *res;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    if(safeGetAddrInfo(NULL, TCP, &hints, &res, "Error getting address info for TCP server socket\n") == ERROR)
+        return ERROR;
+
+    if (bind(*tcp_server_fd, res->ai_addr, res->ai_addrlen) == -1)
+    {
+        fprintf(stderr, "Error binding TCP server: %s\n", strerror(errno));
+        freeaddrinfo(res);
+        return ERROR;
+    }
+    freeaddrinfo(res);
+    if (listen(*tcp_server_fd, 5) == -1)
+    {
+        fprintf(stderr, "Error putting TCP server to listen: %s\n", strerror(errno));
+        return ERROR;
+    }
+    return NO_ERROR;
+}

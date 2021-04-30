@@ -22,6 +22,7 @@
 
 #define max(A,B) ((A)>=(B)?(A):(B))
 #define SELFFD -1
+#define CLOSED -2
 
 // enum dos vários estados associados à rede de nós
 // NONODES no caso em que não existem nós
@@ -48,14 +49,13 @@ int main(int argc, char *argv[])
     // isto é importante porque, de acordo com o protocolo, quando nos estamos
     // a juntar a uma rede que já tem um ou mais nós, apenas após a receção
     // da mensagem de vizinho (EXTERN) é que nos podemos registar
-    int max_fd, counter, tcp_server_fd, we_are_reg=0;
+    int max_fd, counter, we_are_reg=0;
     int external_is_filled, we_used_interest_tmp;
     enum instr instr_code;
     char *user_input, tcp_read_flag;
     char command[150], arg1[150], arg2[150];
     int word_count;
     char message_buffer[150], dgram[1000], nodeslist_received, *list_msg;
-    struct addrinfo hints, *res;
     socklen_t addrlen;
     struct sockaddr addr;
     // potencialmente não será o vizinho externo
@@ -98,28 +98,6 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Error in SIGPIPE: %s\n", strerror(errno));
         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
     }
-
-    safeTCPSocket(&tcp_server_fd);
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-
-    if(safeGetAddrInfo(NULL, TCP, &hints, &res, "Error getting address info for TCP server socket\n") == ERROR)
-        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
-
-    if (bind(tcp_server_fd, res->ai_addr, res->ai_addrlen) == -1)
-    {
-        fprintf(stderr, "Error binding TCP server: %s\n", strerror(errno));
-        freeaddrinfo(res);
-        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
-    }
-    freeaddrinfo(res);
-    if (listen(tcp_server_fd, 5) == -1)
-    {
-        fprintf(stderr, "Error putting TCP server to listen: %s\n", strerror(errno));
-        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
-    }
     helpMenu();
 
     while(1)
@@ -128,8 +106,8 @@ int main(int argc, char *argv[])
         FD_ZERO(&rfds);
 
         FD_SET(STDIN_FILENO, &rfds);
-        FD_SET(tcp_server_fd, &rfds); 
-        max_fd = tcp_server_fd;
+        FD_SET(self.server_fd, &rfds); 
+        max_fd = self.server_fd;
 
         if (external)
         {
@@ -149,7 +127,7 @@ int main(int argc, char *argv[])
         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
 
         // TCP
-        if (FD_ISSET(tcp_server_fd, &rfds))
+        if (FD_ISSET(self.server_fd, &rfds))
         {
             new = malloc(sizeof(viz));
             if(new == NULL)
@@ -157,7 +135,7 @@ int main(int argc, char *argv[])
 
             new->next_av_ix = 0;
             addrlen = sizeof(addr);
-            if ((new->fd = accept(tcp_server_fd, &addr, &addrlen)) == -1)
+            if ((new->fd = accept(self.server_fd, &addr, &addrlen)) == -1)
             {
                 fprintf(stderr, "Error accepting new TCP connection: %s\n", strerror(errno));
                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
@@ -1110,6 +1088,12 @@ int main(int argc, char *argv[])
 
             if (instr_code == JOIN_ID && network_state == NONODES)
             {
+                errcode = createTCPServer(&(self.server_fd), TCP);
+                if (errcode == ERROR)
+                {
+                    fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
+                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                }
                 strncpy(backup->IP, IP, NI_MAXHOST);
                 strncpy(backup->port, TCP, NI_MAXSERV);
                 we_are_reg = 0;
@@ -1241,6 +1225,12 @@ int main(int argc, char *argv[])
             }
             else if (instr_code == JOIN_LINK && network_state == NONODES)
             {
+                errcode = createTCPServer(&(self.server_fd), TCP);
+                if (errcode == ERROR)
+                {
+                    fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
+                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                }
                 strncpy(backup->IP, IP, NI_MAXHOST);
                 strncpy(backup->port, TCP, NI_MAXSERV);
                 memset(net, 0, 64);
@@ -1348,6 +1338,12 @@ int main(int argc, char *argv[])
             // simplesmente se coloca à espera de ligações TCP
             else if(instr_code == JOIN_SERVER_DOWN && network_state == NONODES)
             {
+                errcode = createTCPServer(&(self.server_fd), TCP);
+                if (errcode == ERROR)
+                {
+                    fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
+                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                }
                 strncpy(backup->IP, IP, NI_MAXHOST);
                 strncpy(backup->port, TCP, NI_MAXSERV);
                 we_are_reg = 1; // apenas para não enviarmos depois o REG. Isto não vai causar conflitos
@@ -1557,6 +1553,11 @@ void safeExit(char **cache, int N, viz **external, viz **backup, viz **new,
     {
         // aqui não há necessidade de verificar os valores de retorno porque vamos fechar o programa já a seguir
         unreg(self, regIP, regUDP);
+    }
+    if (self->server_fd != CLOSED)
+    {
+        if (close(self->server_fd))
+            fprintf(stderr, "Error closing tcp server fd when exiting program: %s\n", strerror(errno));
     }
     freeCache(cache, N);
     freeViz(external);
@@ -1961,7 +1962,12 @@ void leave(int *flag_one_node, int *we_are_reg, char *regIP, char *regUDP, viz *
     *end = 0;
     *flag_one_node = 0;
     *we_are_reg = 0;
-    
+    if (self->server_fd != CLOSED)
+    {
+        if (close(self->server_fd))
+            fprintf(stderr, "Error closing server fd: %s\n", strerror(errno));
+        self->server_fd = CLOSED;    
+    }
     if (network_state != NONODES)
     {
         // neste caso não temos de verificar se o UNREG retornou LEAVE_NETWORK visto que já estamos

@@ -10,6 +10,7 @@ typedef struct no{
     char *id;    //identificador do nó
     char IP[NI_MAXHOST]; //endereço IP do nó
     char port[NI_MAXSERV]; //Porto TCP do nó
+    int server_fd; // fd associado ao servidor TCP
 }no;
 
 // estrutura que contem informação dum vizinho
