@@ -72,6 +72,8 @@ int main(int argc, char *argv[])
     no self;
     self.id = NULL; self.net = NULL;
     list_objects *head = NULL;
+    // flag_one_node serve para quando nos enviam um ADVERTISE com o nosso ID
+    // end indica se devemos terminar o programa após uma chamada ao leave
     int flag_no_dest, flag_one_node = 0, end;
     char net[64], ident[64], lixo[64], name[64], subname[64];
     char *id =  NULL;
@@ -1349,7 +1351,11 @@ int main(int argc, char *argv[])
                 strncpy(backup->IP, IP, NI_MAXHOST);
                 strncpy(backup->port, TCP, NI_MAXSERV);
                 we_are_reg = 1; // apenas para não enviarmos depois o REG. Isto não vai causar conflitos
-                // porque apesar de enviarmos o UNREG, o servidor aceita isso
+                // porque apesar de enviarmos o UNREG, o servidor aceita isso se estiver ativo, e se não
+                // estiver faz as retransmissões e segue a sua vida. Podíamos ter colocado aqui uma flag
+                // a indicar se tínhamos feito JOIN_SERVER_DOWN e nesse caso nunca comunicar por UDP, mas achámos
+                // que ia apenas aumentar o nº de linhas de código sem grande necessidade, visto que esta é uma feature
+                // de debug
                 memset(net, 0, 64);
                 memset(ident, 0, 64);
                 memset(lixo, 0, 64);
@@ -1591,6 +1597,7 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
                 leave(flag_one_node, we_are_reg, regIP, regUDP, external, int_neighbours, self, first_entry, head, cache, n_obj, first_interest, &end);
                 if (end)
                     safeExit(cache, N, external, &backup, &new, first_entry, head, first_interest, self, regIP, regUDP, NULL, EXIT_FAILURE);
+                return;
             }
             neigh_tmp = NULL;
             neigh_aux = *int_neighbours;
@@ -1679,6 +1686,7 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
             {
                 fprintf(stderr, "Error writing EXTERN to external (old internal). We shall close the connection now\n");
                 externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self, new, N, head, regIP, regUDP, flag_one_node, we_are_reg);	
+                return; // a função externalLeft não foi preparada para ser chamada recursivamente e prosseguir execução
             }   
             // para todos os vizinhos internos que não foram promovidos a vizinhos externos, notificá-los também
             // que têm um novo vizinho externo
@@ -1702,6 +1710,14 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
             printf("We had no internal neighbours\n");
             network_state = ONENODE;
             *external = NULL;
+            // segundo a especificação do protocolo, um nó entrante apenas se pode registar no servidor UDP quando 
+            // recebe o EXTERN (naturalmente que extrapolámos que o primeiro nó a ligar-se à rede também se pode registar)
+            // Existem casos em que nos ligamos a um nó já presente na rede e nunca recebemos um EXTERN, porque ele falha
+            // antes de se ligar a nós. Nesse caso ficamos sozinhos na rede mas nunca nos chegámos a registar. Sendo assim
+            // registamo-nos aqui
+            if (!(*we_are_reg))
+                reg(self, regIP, regUDP);
+            *we_are_reg = 1;
         }
     }
 
@@ -1712,12 +1728,28 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
         strncpy((*external)->IP, backup->IP, NI_MAXHOST);
         strncpy((*external)->port, backup->port, NI_MAXSERV);
         (*external)->next_av_ix = 0;
-        safeTCPSocket(&((*external)->fd));
+        // colocarmo-nos como nosso próprio backup para o regime transitório enquanto esperamos
+        // o EXTERN deste novo vizinho externo (cujo vizinho externo seremos nós de qualquer maneira)
+        strncpy(backup->IP, self->IP, NI_MAXHOST);
+        strncpy(backup->port, self->port, NI_MAXSERV);
+        errcode = safeTCPSocket(&((*external)->fd));
+        if (errcode == ERROR)
+            safeExit(cache, N, external, &backup, &new, first_entry, head, first_interest, self, regIP, regUDP, NULL, EXIT_FAILURE);
         // ligar ao vizinho de recuperação (futuro vizinho externo)
-        connectTCP((*external)->IP,(*external)->port, (*external)->fd, 
+        errcode = connectTCP((*external)->IP,(*external)->port, (*external)->fd, 
                 "Error getting address info for external node when previous external closes connection\n", 
                 "Error connecting to external node when previous external closes connection\n");
-
+        // falhou a conexão com o vizinho de recuperação. Apesar de não ser exatamente a situação em que falhou
+        // a conexão com externo (por exemplo, aqui não é suposto enviar WITHDRAW) chamamos a mesma função porque
+        // nesta altura já apagámos as entradas do fd na lista de interesse e na tabela de expedição, então ele vai
+        // saltar o código correspondente a essa parte (isto foi testado) e irá diretamente para a parte em que não temos
+        // backup e vai-se tentar ligar aos internos se os tiver, ou então coloca-se ONENODE. Se fosse código mais profissional
+        // faríamos uma função apenas para essa parte e chamávamos aqui, para não iterar pela tabela de expedição e de interesse 
+        if (errcode == ERROR)
+        {
+            externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self, new, N, head, regIP, regUDP, flag_one_node, we_are_reg);	
+            return;
+        }
         // enviar mensagem new, com a informação do IP/porto do nosso servidor TCP 
         errcode = snprintf(message_buffer, 150, "NEW %s %s\n", self->IP, self->port);  
         if (errcode < 0)
@@ -1737,6 +1769,7 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
         {
             fprintf(stderr, "Error writing NEW to external. We shall close the connection now\n");
             externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self, new, N, head, regIP, regUDP, flag_one_node, we_are_reg);	
+            return;
         }
         //se tivermos internos que não sabem ainda que o nosso externo (o seu backup) mudou, notificá-los através da mensagem EXTERN
         if(*int_neighbours)
@@ -1769,9 +1802,8 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
                 neigh_aux = neigh_aux->next;
             }
         }
-        // possivelmente deixar alguma informação na estrutura do backup que está desatualizado
-        // mas como estamos waiting_for_backup, podemos deduzir isso daí
-
+        // possivelmente deixar alguma informação na estrutura do backup a indicar que está desatualizado
+        // se aparecer alguma condição de corrida pode ser necessário
         tab_aux = *first_entry;
         while(tab_aux)
         {
@@ -1793,6 +1825,7 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
             {
                 fprintf(stderr, "error sending ADVERTISE TCP message to external neighbour. We shall close the connection now\n");
                 externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self, new, N, head, regIP, regUDP, flag_one_node, we_are_reg);
+                return;
                 break;
             }
             tab_aux = tab_aux->next;
@@ -1826,6 +1859,7 @@ void internalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
                 leave(flag_one_node, we_are_reg, regIP, regUDP, external, int_neighbours, self, first_entry, head, cache, n_obj, first_interest, &end);
                 if (end)
                     safeExit(cache, N, external, &backup, &new, first_entry, head, first_interest, self, regIP, regUDP, NULL, EXIT_FAILURE);
+                return;
             }
             neigh_tmp2 = NULL;
             neigh_tmp1 = *int_neighbours;
