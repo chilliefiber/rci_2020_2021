@@ -4,7 +4,6 @@
 #include <arpa/inet.h>
 #include "tcp.h"
 #include "errcheck.h"
-//#include <stdio.h> // depois tirar este
 int writeTCP(int fd, ssize_t nleft, char *buffer)
 {
     ssize_t nwritten;
