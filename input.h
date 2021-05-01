@@ -69,6 +69,16 @@ int isName(char name[]);
  */
 int countblankSpace(char terminal[]);
 
-
+/**
+ * checkEntryArgs: função que verifica os argumentos de entrada ao correr o programa no terminal
+ * \param **argv: duplo ponteiro para argv (array de strings)
+ * \param argc: número de argumentos de entrada
+ * \param **IP: duplo ponteiro para a string IP (endereço IP do nó da aplicação)
+ * \param **TCP: duplo ponteiro para a string TCP (porto TCP em que o nó ficará à escuta)
+ * \param **regIP: duplo ponteiro para a string regIP (endereço IP do servidor de nós)
+ * \param **regUDP: duplo ponteiro para a string regUDP (porto UDP do servidor de nós)
+ * \param *N: ponteiro para a capacidade da cache N
+ * \retorna NO_ERROR se não houver erro e END_EXECUTION se houver erro na alocação dinâmica de memória
+ */
 int checkEntryArgs(char **argv, int argc, char **IP, char **TCP, char **regIP, char **regUDP, int *N);
 #endif
