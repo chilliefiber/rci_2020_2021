@@ -47,11 +47,13 @@ messages *processReadTCP(viz *sender, ssize_t start_ix, int *errcode);
 char readTCP(viz* sender);
 /**
  * freeMessage Limpa uma estrutura alocada pelo messagesAlloc
+ * \param msg estrutura alocada pelo messagesAlloc
  */
 void freeMessage(messages *msg);
 
 /**
  * freeMessageListLimpa uma lista de estruturas alocadas pelo messagesAlloc
+ * \param msg_list lista que é para limpar
  */
 void freeMessageList(messages **msg_list);
 #endif 

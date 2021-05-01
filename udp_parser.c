@@ -20,7 +20,7 @@ int parseNodeListRecursive(char* datagram, node_list **list, int *num_nodes)
     node_list *this = malloc(sizeof(node_list));
     if(this == NULL)
         return END_EXECUTION;
-    
+
     this->next = NULL;
     rvalue = sscanf(datagram,"%s %s\n", this->IP, this->port);
     // um EOF indica muito provavelmente um erro no sscanf mesmo (visto que estamos a ler para string)
@@ -57,7 +57,7 @@ int parseNodeListRecursive(char* datagram, node_list **list, int *num_nodes)
         // em free(this) e depois na função que chamar esta usamos a freeNodesList
         // para limpar os nós anteriores àquele que deu erro
         return parseNodeListRecursive(datagram + ix + 1, &(this->next), num_nodes);
-    
+
     return NO_ERROR;
 }
 
@@ -66,7 +66,7 @@ int parseNodeListRecursive(char* datagram, node_list **list, int *num_nodes)
 // net é o número da rede para a qual estamos à espera de receber a lista dos nós
 // nodeslist_received é um booleano
 char* isNodesList(char* datagram, char *net, char *nodeslist_received, int *error_flag){
-    char message_until_newline[100]; // passar o 100 para uma constante, depois passar o 100
+    char message_until_newline[100]; 
     char message_supposed_to_recv[100];
     *nodeslist_received = 0;
     int errcode;
@@ -193,7 +193,8 @@ int getDgram(char *send_error_msg, char *send_IP, char *send_UDP, char *dgram)
         // ler a resposta do servidor
         errcode = safeRecvFrom(fd_udp, dgram, 999);
     }
-
+    if (errcode == TIMER_EXPIRED)
+        printf("We tried 3 times and got no answer. We will stop sending\n");
     // fechar o fd associado à comunicação por UDP
     if (close(fd_udp) == -1)
         fprintf(stderr, "Error closing socket for UDP client: %s\n", strerror(errno));
@@ -205,7 +206,7 @@ int getDgram(char *send_error_msg, char *send_IP, char *send_UDP, char *dgram)
         return END_EXECUTION;
     return DGRAM_RECEIVED;
 }
- 
+
 int unreg(no *self, char *send_IP, char *send_UDP)
 {
     // criar string para enviar o unreg
@@ -221,7 +222,7 @@ int unreg(no *self, char *send_IP, char *send_UDP)
         fprintf(stderr, "error in UNREG UDP message creation: snprintf needed to write past the buffer. Consider increasing the buffer's size\n");
         return LEAVE_NETWORK;
     }
-    
+
     // se houve algum tipo de erro, devolvê-lo à main
     //
     if ((errcode = getDgram("error in UNREG UDP message send\n", send_IP, send_UDP, dgram)) != DGRAM_RECEIVED)
@@ -247,7 +248,7 @@ int getNodesList(char *self_net, char *send_IP, char *send_UDP, char *dgram)
         fprintf(stderr, "error in NODES UDP message creation: snprintf needed to write past the buffer. Consider increasing the buffer's size\n");
         return LEAVE_NETWORK;
     }
-    
+
     // se houve algum tipo de erro, devolvê-lo à main
     if ((errcode = getDgram("error in JOIN UDP message send\n", send_IP, send_UDP, dgram)) != DGRAM_RECEIVED)
         return errcode;
@@ -438,55 +439,4 @@ int reg(no *self, char *send_IP, char *send_UDP)
     }
     return errcode; // neste caso ERRCODE será END_EXECUTION
 }
-/*
-node_list *parseNodelist(char* datagram, int *num_nodes)
-{
-    int datagram_ix = 0, line_ix=0;
-    node_list* list = NULL;
-    *num_nodes = -1;
-    char c = datagram[datagram_ix];
-    char line[150]; // colocar aqui uma variavel com #DEFINE 150
-    while (c != '\0')
-    {
-        // quando num_nodes == -1 estamos a ler o comando e nao um par IP/porto
-        if (*num_nodes != -1)
-        {
-            line[line_ix] = c;
-            line_ix++;
-        }
-        if (c == '\n')
-        {
-            (*num_nodes)++;
-            // neste caso ou é zero, e portanto lemos apenas o comando
-            // ou devemos fazer um elemento da lista de nós
-            if (*num_nodes)
-            {   
-                line[line_ix] = '\0';
-                addLineToList(&list, line);
-                line_ix = 0; // reiniciar o indice, porque vamos começar a ler uma linha nova
-            }
-        }
-        datagram_ix++;
-        c = datagram[datagram_ix];
-    }
-    return list;
-}
-
-void addLineToList(node_list **list, char *line)
-{
-    node_list *this = safeMalloc(sizeof(node_list));
-    this.next = NULL;
-    node_list *aux = *list;
-    sscanf(line,"%s %s ", this.IP, this.port);
-    if (*list == NULL)
-        *list = this;
-    else
-    {
-        // go to last element of list
-        for (aux; aux->next != NULL; aux = aux->next);
-        // place newly created element in list
-        aux->next = this;
-    }
-}
-*/
 

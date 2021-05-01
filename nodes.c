@@ -11,11 +11,11 @@ int addToList(internals **int_neighbours, viz *new)
     internals *aux = *int_neighbours;
     *int_neighbours = malloc(sizeof(internals));
     if(*int_neighbours == NULL)
-    return END_EXECUTION;
-    
+        return END_EXECUTION;
+
     (*int_neighbours)->this = new;
     (*int_neighbours)->next = aux;
-    
+
     return NO_ERROR;
 }
 
@@ -23,8 +23,13 @@ void freeViz(viz **v)
 {
     if (*v)
     {
-        if (close((*v)->fd))
-            fprintf(stderr, "error closing file descriptor of neighbour: %s\n", strerror(errno));
+        // pode haver viz que estejam com o fd negativo devido a algum valor
+        // de sinal que foi colocado
+        if ((*v)->fd > 0)
+        {
+            if (close((*v)->fd))
+                fprintf(stderr, "error closing file descriptor of neighbour: %s\n", strerror(errno));
+        }
         free(*v);
         *v = NULL;
     }
@@ -37,8 +42,11 @@ void freeIntNeighbours(internals **int_neighbours)
     {
         neigh_aux = *int_neighbours;
         *int_neighbours = (*int_neighbours)->next;
-        if (close(neigh_aux->this->fd))
-            fprintf(stderr, "error closing file descriptor of internal neighbour: %s\n", strerror(errno));
+        if (neigh_aux->this->fd > 0)
+        {
+            if (close(neigh_aux->this->fd))
+                fprintf(stderr, "error closing file descriptor of internal neighbour: %s\n", strerror(errno));
+        }
         free(neigh_aux->this);
         free(neigh_aux);
         neigh_aux = NULL;
