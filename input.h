@@ -23,7 +23,7 @@ void warnOfTrashReceived(char* warning, char *trash);
  * getParam: função que processa os parâmetros introduzidos após o comando/intrução (join, create, get)
  * \param *input: ponteiro para a string input
  * \param *errcode: ponteiro para o int errcode (verificação de erros)
- * \retorna um ponteiro para a string que conterá os parâmetros introduzidos à frente da instrução
+ * \return um ponteiro para a string que conterá os parâmetros introduzidos à frente da instrução
  */
 char* getParam(char *input, int *errcode);
 
@@ -31,35 +31,35 @@ char* getParam(char *input, int *errcode);
  * readCommand: função que lê do terminal (pelo stdin) o comando introduzido pelo utilizador
  * \param *instr_code: ponteiro para uma variável do tipo instr
  * \param *errcode: ponteiro para o int errcode (verificação de erros)
- * \retorna um ponteiro para a string que conterá os parâmetros introduzidos
+ * \return um ponteiro para a string que conterá os parâmetros introduzidos
  */
 char *readCommand(enum instr *instr_code, int *errcode);
 
 /**
  * checkDigit: função que recebe uma string e verifica se esta é só composta unicamente por digitos
  * \param word: string
- * \retorna 1 se a string tiver só digitos, retorna 0 caso contrário
+ * \return 1 se a string tiver só digitos, return 0 caso contrário
  */
 int checkDigit(char word[]);
 
 /**
  * isIP: função que recebe uma string e verifica se esta corresponde a um endereço IPv4 válido
  * \param ip: string
- * \retorna 1 se a string corresponde a um endereço IPv4 válido, retorna 0 caso contrário
+ * \return 1 se a string corresponde a um endereço IPv4 válido, return 0 caso contrário
  */
 int isIP(char ip[]); 
 
 /**
  * isPort: função que recebe uma string e verifica se esta corresponde a um porto válido
  * \param port: string
- * \retorna 1 se a string corresponde a um porto válido, retorna 0 caso contrário
+ * \return 1 se a string corresponde a um porto válido, return 0 caso contrário
  */
 int isPort(char port[]);
 
 /**
  * isName: função que recebe uma string e verifica se esta corresponde a um nome dum objeto válido (i.e id.subname)
  * \param name: string
- * \retorna 1 se a string corresponde a um nome de objeto válido, retorna 0 caso contrário
+ * \return 1 se a string corresponde a um nome de objeto válido, return 0 caso contrário
  */
 int isName(char name[]);
 
@@ -78,7 +78,7 @@ int countblankSpace(char terminal[]);
  * \param **regIP: duplo ponteiro para a string regIP (endereço IP do servidor de nós)
  * \param **regUDP: duplo ponteiro para a string regUDP (porto UDP do servidor de nós)
  * \param *N: ponteiro para a capacidade da cache N
- * \retorna NO_ERROR se não houver erro e END_EXECUTION se houver erro na alocação dinâmica de memória
+ * \return NO_ERROR se não houver erro e END_EXECUTION se houver erro na alocação dinâmica de memória
  */
 int checkEntryArgs(char **argv, int argc, char **IP, char **TCP, char **regIP, char **regUDP, int *N);
 #endif
