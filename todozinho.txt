@@ -5,11 +5,12 @@ FUNCIONALIDADE EXTRA
 -juntar a um elemento aleatorio da lista
 -robustez do programa contra UDP (como falado no email)
 -cache com numero aleatorio de objetos
+-nao deixa juntar um no com um ID que ja esteja na rede
 
 Reler tudo
 
 A FAZER
-so ter o servidor TCP quando estamos ligados a uma rede, MAS antes disso testar com um servidor desligado de rede e ligarmo nos a ele
-corrigir bug que apareceu e esta no outro ficheiro
-Adicionar as verificações de todos os valores de saida do read
+corrigir bug que apareceu e esta no outro ficheiro (bug nao da para replicar)
+Verificar bug GROOVY: basicamente, quando temos uma rede nas 2 casas, e um gajo saiu na minha rede e havia outros gajos ligados a ele que o tinham como externo (nao sei se eram internos se externos) houve um que nao deu pela saida do gajo que saiu e prosseguiu normalmente como se nao houvesse a saida, ficando desconexo dos outros. O programa respondia a comandos do utilizador. Ao fazer get groovy.obj (groovy era o id do tipo que saiu) o gajo que nao se tinha apercebido apercebeu-se e voltou normalmente à rede. No packetdump do wireshark começar a ver com filtro de display ip.addr ==  148.71.16.49 no pacote 1731118. Esse pacote parece fazer parte de uma situação em que não houve erro, com outro vizinho do groovy pertencente ao meu computador. No caso do gajo que nao se mancou da saida, a seguir tem uns pacotes em que o groovy (que é o 59001) envia 4 ou 5 FIN,ACK de seguida para o gajo
+Ele repetiu o bug (o battlez na saida do 59003, que era o deepblue). So ao fazer get se apercebeu que estava sozinho na rede ver Frame Number: 2082858 em que o battlez envia um RST à toa para o deepblue que ja tinha saido ha muito. mais tarde eu faço o get deepblue.cenas ele envia o interest da pela falha e faz o syn para o backup dele (que ja tinha saido ha muito) e depois apercebe-se que esta sozinho
 Verificar valor de retorno de todas as funções!!!!!! 

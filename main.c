@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
         // select upon which file descriptor to act 
         counter = select(max_fd+1, &rfds, (fd_set*) NULL, (fd_set*) NULL, (struct timeval*) NULL);
         if(counter<=0) 
-        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+            safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
 
         // TCP
         if (self.server_fd != CLOSED && FD_ISSET(self.server_fd, &rfds))
@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
                 {
                     fprintf(stderr, "error in ADVERTISE TCP message creation: snprintf needed a bigger buffer\n");
                     leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, 
-                          &head, cache, &n_obj, &first_interest, &end);
+                            &head, cache, &n_obj, &first_interest, &end);
                     if (end)
                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                     continue; // como saímos da rede não vale a pena responder a mais nada
@@ -210,7 +210,7 @@ int main(int argc, char *argv[])
                     {
                         fprintf(stderr, "error in EXTERN TCP message creation when we get a new internal neighbour: snprintf needed a bigger buffer\n");
                         leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, 
-                              &head, cache, &n_obj, &first_interest, &end);
+                                &head, cache, &n_obj, &first_interest, &end);
                         if (end)
                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                     }
@@ -281,7 +281,7 @@ int main(int argc, char *argv[])
                                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                             continue;
                         }
-						network_state = MANYNODES;
+                        network_state = MANYNODES;
                         we_are_reg = 1;
                     }
                     // este é o caso em que recebemos connect, mas 
@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
                             fprintf(stderr, "error in EXTERN TCP message creation when there are only two nodes: snprintf needed a bigger buffer\n");
                             freeMessageList(&msg_list);
                             leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, 
-                                  &head, cache, &n_obj, &first_interest, &end);
+                                    &head, cache, &n_obj, &first_interest, &end);
                             if (end)
                                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                             break;
@@ -678,8 +678,9 @@ int main(int argc, char *argv[])
                     msg_aux = NULL;
                 }
             }
-            else if (tcp_read_flag == MSG_CLOSED)
+            else if (tcp_read_flag == MSG_CLOSED || tcp_read_flag == MSG_READ_ERROR || tcp_read_flag == MSG_FORMAT_ERROR)
                 externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
+            // se for MSG_PARTIAL podemos ignorar
         }
         // mudar isto tudo
         neigh_aux = int_neighbours; // neigh_aux irá apontar para o elemento atual da lista
@@ -1069,11 +1070,8 @@ int main(int argc, char *argv[])
                     }
                 }
                 // vizinho interno fez leave e fechou as conexões
-                else if (tcp_read_flag == MSG_CLOSED)
-                {
+                else if (tcp_read_flag == MSG_CLOSED || tcp_read_flag == MSG_READ_ERROR || tcp_read_flag == MSG_FORMAT_ERROR)
                     internalLeft(&first_entry, &n_obj, cache, &external, backup, &neigh_aux, &neigh_tmp, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
-                    // adicionar as verificações dos outros tcp_read_flag possíveis
-                }
             }
             // no caso em que não está set, também temos de iterar pela lista
             else
@@ -1968,7 +1966,7 @@ void internalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
 }
 
 void leave(int *flag_one_node, int *we_are_reg, char *regIP, char *regUDP, viz **external, internals **int_neighbours, no *self, tab_entry **first_entry,
-          list_objects **head, char **cache, int *n_obj, list_interest **first_interest, int *end)
+        list_objects **head, char **cache, int *n_obj, list_interest **first_interest, int *end)
 {
     int errcode;
     *end = 0;
