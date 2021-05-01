@@ -242,7 +242,7 @@ int isIP(char ip[])
 int isPort(char port[])
 {
     int val, errcode;
-    errcode = sscanf(port, "%d", val);
+    errcode = sscanf(port, "%d", &val);
     if (errcode == EOF)
         fprintf(stderr, "Error in sscanf: %s\n", strerror(errno));
     if (errcode <= 0)

@@ -9,11 +9,11 @@ typedef struct tab_entry{
 }tab_entry;
 
 /**
- * createinsertTabEntry: função que cria uma entrada na tabela de expedição (basicamente cria e adiciona um nó a lista simplesmente ligada) e retorna o topo da lista atualizado no final
+ * createinsertTabEntry: função que cria uma entrada na tabela de expedição (basicamente cria e adiciona um nó a lista simplesmente ligada) e return o topo da lista atualizado no final
  * \param **first_entry: duplo ponteiro para a primeira entrada da tabela de expedição (topo da lista)
  * \param *id_dst: ponteiro para a string correspondente ao identificador do nó destino correspondente à entrada da tabela que se vai adicionar
  * \param fd: inteiro correspondente ao file descriptor que está associado à sessão TCP que nos permite chegar ào nó destino 
- * \retorna NO_ERROR se não houver erro e END_EXECUTION se houver erro na alocação dinâmica de memória
+ * \return NO_ERROR se não houver erro e END_EXECUTION se houver erro na alocação dinâmica de memória
  */
 int createinsertTabEntry(tab_entry **first_entry, char *id_dst, int fd);
 
@@ -35,7 +35,7 @@ void deleteTabEntryfd(tab_entry **first_entry, int fd_out);
  * checkTabEntry: função que verifica se existe na tabela de expedição uma entrada com o identificador id (importante para pesquisa de objetos nomeados)
  * \param *first_entry: ponteiro para a primeira entrada da tabela de expedição (topo da lista)
  * \param *id: ponteiro para a string correspondente ao identificador do nó
- * \retorna 1 se existir a entrada na tabela e retorna 0 caso não exista
+ * \return 1 se existir a entrada na tabela e return 0 caso não exista
  */
 int checkTabEntry(tab_entry *first_entry, char *id);
 

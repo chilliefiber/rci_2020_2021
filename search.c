@@ -10,12 +10,15 @@ int addInterest(list_interest **first_interest, char *obj, int fd)
     list_interest *tmp = *first_interest;
     list_interest *new_interest = malloc(sizeof(list_interest));
     if(new_interest == NULL)
-    return END_EXECUTION;
-    
+        return END_EXECUTION;
+
     new_interest->obj = malloc(strlen(obj)+1);
-    if(new_interest == NULL)
-    return END_EXECUTION;
-    
+    if(new_interest->obj == NULL)
+    {
+        free(new_interest);
+        return END_EXECUTION;
+    }
+
     strcpy(new_interest->obj, obj);
     new_interest->fd = fd;
 
@@ -105,14 +108,14 @@ int deleteInterestWITHDRAW(list_interest **first_interest, char *id)
     list_interest *interest_aux = *first_interest;
     list_interest *interest_tmp = NULL;
     int we_used_interest_tmp = 0;
-    
+
     while(interest_aux != NULL)
     {
         ident = NULL;
-	    ident = getidfromName(interest_aux->obj, ident);
-	    if(ident == NULL)
-        return END_EXECUTION;
-        
+        ident = getidfromName(interest_aux->obj, ident);
+        if(ident == NULL)
+            return END_EXECUTION;
+
         if(!strcmp(ident, id))
         {
             interest_tmp = interest_aux->next;
@@ -237,11 +240,17 @@ int createinsertObject(list_objects **head, char *subname, char *id)
     memset(str_id, 0, 150);
 
     errcode = snprintf(str_id, 150, "%s.", id);
-    if (str_id == NULL || errcode < 0 || errcode >= 150)
+    if (errcode < 0)
     {
         fprintf(stderr, "error in in filling string str_id\n");
         return END_EXECUTION;
     }
+    if (errcode >= 150)
+    {
+        printf("Error: object size is too big\n");
+        return NO_ERROR;
+    }
+
 
     str = getConcatString(str_id, subname);
     if(str == NULL)
@@ -256,12 +265,19 @@ int createinsertObject(list_objects **head, char *subname, char *id)
         list_objects *tmp = *head;
         list_objects *new_obj = malloc(sizeof(list_objects));
         if(new_obj == NULL)
-        return END_EXECUTION;
-        
+        {   
+            free(str);
+            return END_EXECUTION;
+        }
+
         new_obj->objct = malloc(strlen(str)+1);
         if(new_obj->objct == NULL)
-        return END_EXECUTION;
-        
+        {  
+            free(new_obj); 
+            free(str);
+            return END_EXECUTION;
+        }
+
         strcpy(new_obj->objct, str);
 
         if(*head == NULL)
@@ -280,7 +296,7 @@ int createinsertObject(list_objects **head, char *subname, char *id)
         } 
     }
     free(str);
-    
+
     return NO_ERROR;
 }
 
@@ -337,7 +353,7 @@ int saveinCache(char **cache, char *name, int *n_obj, int N)
             cache[i] = NULL;
             cache[i] = malloc(strlen(cache[i+1])+1);
             if(cache[i] == NULL)
-            return END_EXECUTION;
+                return END_EXECUTION;
             strcpy(cache[i], cache[i+1]);
         }
         free(cache[i]);
@@ -347,8 +363,8 @@ int saveinCache(char **cache, char *name, int *n_obj, int N)
     cache[(*n_obj)-1] = NULL;
     cache[(*n_obj)-1] = malloc(strlen(name)+1);
     if(cache[(*n_obj)-1] == NULL)
-    return END_EXECUTION;
-    
+        return END_EXECUTION;
+
     strcpy(cache[(*n_obj)-1], name);
 
     return NO_ERROR;
@@ -387,8 +403,10 @@ int deleteCacheid(char **cache, int *n_obj, char *id)
         ident = NULL;
         ident = getidfromName(cache[i], ident);
         if(ident == NULL)
-        return END_EXECUTION;
-
+        {
+            FreeCacheAuxList(&head_c);
+            return END_EXECUTION;
+        }
         if(!strcmp(ident, id))
         {   
             free(cache[i]);
@@ -399,7 +417,7 @@ int deleteCacheid(char **cache, int *n_obj, char *id)
         {
             if(createinsertCacheAux(&head_c, cache[i]) == END_EXECUTION)
             {
-			    FreeCacheAuxList(&head_c);
+                FreeCacheAuxList(&head_c);
                 return END_EXECUTION;
             }
             free(cache[i]);
@@ -414,8 +432,10 @@ int deleteCacheid(char **cache, int *n_obj, char *id)
     {
         cache[i] = malloc(strlen(aux->obj)+1);
         if(cache[i] == NULL)
-        return END_EXECUTION;
-        
+        {
+            FreeCacheAuxList(&head_c);
+            return END_EXECUTION;
+        }
         strcpy(cache[i], aux->obj);
         aux = aux->next;
         i++;
@@ -435,8 +455,10 @@ int createinsertCacheAux(cache_aux **head_c, char *objct)
 
     new->obj = malloc(strlen(objct)+1);
     if(new->obj == NULL)
+    {
+        free(new);
         return END_EXECUTION;
-  
+    }
     strcpy(new->obj, objct);
 
     if(*head_c == NULL)
@@ -476,13 +498,13 @@ void FreeCacheAuxList(cache_aux **head_c)
 char **createCache(int N)
 {
     int i;
-    char **createCache = malloc(N * sizeof(char*));
-    if(createCache == NULL)
+    char **cache = malloc(N * sizeof(char*));
+    if(cache == NULL)
         return NULL;
-        
+
     for (i=0; i < N; i++)
-        createCache[i] = NULL;
-    return createCache;
+        cache[i] = NULL;
+    return cache;
 }
 
 void freeCache(char **cache, int N)

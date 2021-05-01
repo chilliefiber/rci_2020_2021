@@ -11,12 +11,15 @@ int createinsertTabEntry(tab_entry **first_entry, char *id_dst, int fd)
     tab_entry *tmp = *first_entry;
     tab_entry *new_entry = malloc(sizeof(tab_entry));
     if(new_entry == NULL)
-    return END_EXECUTION;
+        return END_EXECUTION;
 
     new_entry->id_dest = malloc(strlen(id_dst)+1);
     if(new_entry->id_dest == NULL)
-    return END_EXECUTION;
-    
+    {
+        free(new_entry);
+        return END_EXECUTION;
+    }
+
     strcpy(new_entry->id_dest, id_dst);
     new_entry->fd_sock = fd;
 
