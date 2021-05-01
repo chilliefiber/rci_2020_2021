@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     // lista de mensagens recebidas num readTCP
     messages *msg_list, *msg_aux;
     no self;
-    self.id = NULL; self.net = NULL;
+    self.id = NULL; self.net = NULL; self.server_fd = CLOSED;
     list_objects *head = NULL;
     // flag_one_node serve para quando nos enviam um ADVERTISE com o nosso ID
     // end indica se devemos terminar o programa após uma chamada ao leave
@@ -104,10 +104,13 @@ int main(int argc, char *argv[])
     {
         // initialize file descriptor set
         FD_ZERO(&rfds);
-
+        max_fd = STDIN_FILENO;
         FD_SET(STDIN_FILENO, &rfds);
-        FD_SET(self.server_fd, &rfds); 
-        max_fd = self.server_fd;
+        if (self.server_fd != CLOSED)
+        {
+            FD_SET(self.server_fd, &rfds); 
+            max_fd = self.server_fd;
+        }
 
         if (external)
         {
@@ -127,7 +130,7 @@ int main(int argc, char *argv[])
         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
 
         // TCP
-        if (FD_ISSET(self.server_fd, &rfds))
+        if (self.server_fd != CLOSED && FD_ISSET(self.server_fd, &rfds))
         {
             new = malloc(sizeof(viz));
             if(new == NULL)
@@ -1088,11 +1091,14 @@ int main(int argc, char *argv[])
 
             if (instr_code == JOIN_ID && network_state == NONODES)
             {
-                errcode = createTCPServer(&(self.server_fd), TCP);
-                if (errcode == ERROR)
+                if (self.server_fd == CLOSED)
                 {
-                    fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
-                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                    errcode = createTCPServer(&(self.server_fd), TCP);
+                    if (errcode == ERROR)
+                    {
+                        fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
+                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                    }
                 }
                 strncpy(backup->IP, IP, NI_MAXHOST);
                 strncpy(backup->port, TCP, NI_MAXSERV);
@@ -1225,11 +1231,14 @@ int main(int argc, char *argv[])
             }
             else if (instr_code == JOIN_LINK && network_state == NONODES)
             {
-                errcode = createTCPServer(&(self.server_fd), TCP);
-                if (errcode == ERROR)
+                if (self.server_fd == CLOSED)
                 {
-                    fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
-                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                    errcode = createTCPServer(&(self.server_fd), TCP);
+                    if (errcode == ERROR)
+                    {
+                        fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
+                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                    }
                 }
                 strncpy(backup->IP, IP, NI_MAXHOST);
                 strncpy(backup->port, TCP, NI_MAXSERV);
@@ -1338,11 +1347,14 @@ int main(int argc, char *argv[])
             // simplesmente se coloca à espera de ligações TCP
             else if(instr_code == JOIN_SERVER_DOWN && network_state == NONODES)
             {
-                errcode = createTCPServer(&(self.server_fd), TCP);
-                if (errcode == ERROR)
+                if (self.server_fd == CLOSED)
                 {
-                    fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
-                    safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                    errcode = createTCPServer(&(self.server_fd), TCP);
+                    if (errcode == ERROR)
+                    {
+                        fprintf(stderr, "We couldn't create the TCP server. Exiting the program\n");
+                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
+                    }
                 }
                 strncpy(backup->IP, IP, NI_MAXHOST);
                 strncpy(backup->port, TCP, NI_MAXSERV);
@@ -1962,12 +1974,6 @@ void leave(int *flag_one_node, int *we_are_reg, char *regIP, char *regUDP, viz *
     *end = 0;
     *flag_one_node = 0;
     *we_are_reg = 0;
-    if (self->server_fd != CLOSED)
-    {
-        if (close(self->server_fd))
-            fprintf(stderr, "Error closing server fd: %s\n", strerror(errno));
-        self->server_fd = CLOSED;    
-    }
     if (network_state != NONODES)
     {
         // neste caso não temos de verificar se o UNREG retornou LEAVE_NETWORK visto que já estamos
