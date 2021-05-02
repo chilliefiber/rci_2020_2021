@@ -22,6 +22,7 @@ typedef struct viz{
     // proximo indice de buffer onde podemos colocar um caractere. Fica com 
     // este tipo (ssize_t) porque entra para os calculos do argumento do read
     ssize_t next_av_ix; 
+    int contact_filled;
 }viz;
 
 // lista dos vizinhos internos do nó

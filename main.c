@@ -137,6 +137,7 @@ int main(int argc, char *argv[])
                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
 
             new->next_av_ix = 0;
+            new->contact_filled = 0;
             addrlen = sizeof(addr);
             if ((new->fd = accept(self.server_fd, &addr, &addrlen)) == -1)
             {
@@ -189,6 +190,7 @@ int main(int argc, char *argv[])
                 new = NULL;
                 network_state = MANYNODES;
                 external_is_filled = 0;
+                external->contact_filled = 0;
                 flag_one_node = 1;
             } 
             // se este processo estava em modo MANYNODES, alguém que nos contacta
@@ -252,6 +254,15 @@ int main(int argc, char *argv[])
                 while (msg_list != NULL)
                 {
                     word_count = sscanf(msg_list->message, "%s %s %s\n", command, arg1, arg2);
+                    if (word_count == EOF)
+                        fprintf(stderr, "sscanf error:%s\n", strerror(errno));
+                    if (word_count < 2)
+                    {
+                        printf("Received a poorly formatted message from an internal neigbour. Closing connection with it\n");
+                        freeMessageList(&msg_list);
+                        externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
+                        break;
+                    }
                     // adicionar aqui a verificação do sscanf e errno e assim
 
                     // sempre que recebemos EXTERN devemos atualizar a informação do nosso nó de backup
@@ -271,12 +282,14 @@ int main(int argc, char *argv[])
                         if (errcode == END_EXECUTION)
                         {
                             fprintf(stderr, "An error occured registering in the server after receiving EXTERN. We're exiting the program\n");
+                            freeMessageList(&msg_list);
                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                         }
                         if (errcode == LEAVE_NETWORK)
                         {
                             fprintf(stderr, "An error occured and we're leaving the network\n");
                             leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
+                            freeMessageList(&msg_list);
                             if (end)
                                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                             continue;
@@ -288,12 +301,13 @@ int main(int argc, char *argv[])
                     // estávamos sozinhos na rede, então o nosso vizinho externo foi
                     // o tipo que fez o connect e ele envia-nos o NEW. Com a informação
                     // recebida no new, vamos poder retribuir o EXTERN
-                    if (!strcmp(command, "NEW") && word_count == 3)
+                    else if (!strcmp(command, "NEW") && word_count == 3)
                     {
                         printf("Just received our newly arrived external's data\n");
                         strncpy(external->IP, arg1, NI_MAXHOST);
                         strncpy(external->port, arg2, NI_MAXSERV);
                         external_is_filled = 1;
+                        external->contact_filled = 1;
 
                         errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", external->IP, external->port);  
                         if (errcode < 0)
@@ -308,6 +322,7 @@ int main(int argc, char *argv[])
                             freeMessageList(&msg_list);
                             leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, 
                                     &head, cache, &n_obj, &first_interest, &end);
+                            freeMessageList(&msg_list);
                             if (end)
                                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                             break;
@@ -350,7 +365,7 @@ int main(int argc, char *argv[])
 
                     // para quando recebemos uma mensagem ADVERTISE do vizinho externo, reencaminhar esta mensagem para os nossos internos (se houverem)
                     // no final deste processo adicionamos a entrada a nossa tabela de expedição     
-                    if (!strcmp(command, "ADVERTISE") && word_count == 2)
+                    else if (!strcmp(command, "ADVERTISE") && word_count == 2)
                     {
                         if(checkTabEntry(first_entry, arg1) == 1)
                         {
@@ -386,13 +401,16 @@ int main(int argc, char *argv[])
                                 neigh_aux = neigh_aux->next;
                             }
                             if(createinsertTabEntry(&first_entry, arg1, external->fd) == END_EXECUTION)
+                            {
+                                freeMessageList(&msg_list);
                                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                            }
                         }
                     }
 
                     // para quando recebemos uma mensagem WITHDRAW do vizinho externo, reencaminhar esta mensagem para os nossos internos (se houverem)
                     // no final deste processo eliminamos a respetiva entrada da tabela de expedição correspondente ao id do nó que saiu da rede
-                    if (!strcmp(command, "WITHDRAW") && word_count == 2)
+                    else if (!strcmp(command, "WITHDRAW") && word_count == 2)
                     {
                         neigh_tmp = NULL;
                         neigh_aux = int_neighbours;
@@ -408,19 +426,28 @@ int main(int argc, char *argv[])
                         }
                         deleteTabEntryid(&first_entry, arg1);
                         if(deleteInterestWITHDRAW(&first_interest, arg1) == END_EXECUTION)
+                        {
+                            freeMessageList(&msg_list);
                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                        }
 
                         if(deleteCacheid(cache, &n_obj, arg1) == END_EXECUTION)
+                        {
+                            freeMessageList(&msg_list);
                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                        }
                     }
 
                     //para quando recebemos uma mensagem INTEREST do vizinho externo
-                    if (!strcmp(command, "INTEREST") && word_count == 2)
+                    else if (!strcmp(command, "INTEREST") && word_count == 2)
                     {
                         id = NULL;
                         id = getidfromName(arg1, id);
                         if(id == NULL)
+                        {
+                            freeMessageList(&msg_list);
                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                        }
 
                         // verificar primeiro se o identificador do objeto corresponde ao nosso (se somos o destino da mensagem de interesse)    
                         if(!strcmp(self.id, id))
@@ -433,11 +460,13 @@ int main(int argc, char *argv[])
                                 if (errcode < 0)
                                 {
                                     fprintf(stderr, "error in DATA TCP message creation: snprintf returned a negative value\n");
+                                    freeMessageList(&msg_list);
                                     safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                                 }
                                 if (errcode >= 150)
                                 {
                                     fprintf(stderr, "error in DATA TCP message creation: snprintf needed a bigger buffer\n");
+                                    freeMessageList(&msg_list);
                                     leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
                                     if (end)
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
@@ -450,11 +479,13 @@ int main(int argc, char *argv[])
                                 if (errcode < 0)
                                 {
                                     fprintf(stderr, "error in NODATA TCP message creation: snprintf returned a negative value\n");
+                                    freeMessageList(&msg_list);
                                     safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                                 }
                                 if (errcode >= 150)
                                 {
                                     fprintf(stderr, "error in NODATA TCP message creation: snprintf needed a bigger buffer\n");
+                                    freeMessageList(&msg_list);
                                     leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
                                     if (end)
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
@@ -485,11 +516,13 @@ int main(int argc, char *argv[])
                                 if (errcode < 0)
                                 {
                                     fprintf(stderr, "error in DATA TCP message creation: snprintf returned a negative value\n");
+                                    freeMessageList(&msg_list);
                                     safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                                 }
                                 if (errcode >= 150)
                                 {
                                     fprintf(stderr, "error in DATA TCP message creation: snprintf needed a bigger buffer\n");
+                                    freeMessageList(&msg_list);
                                     leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
                                     if (end)
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
@@ -509,7 +542,10 @@ int main(int argc, char *argv[])
                                 if(checkInterest(first_interest, arg1, external->fd) != 1)
                                 {
                                     if(addInterest(&first_interest, arg1, external->fd) == END_EXECUTION)
+                                    {
+                                        freeMessageList(&msg_list);
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                    }
                                 }
                                 // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
                                 tab_aux = first_entry;
@@ -544,14 +580,40 @@ int main(int argc, char *argv[])
                                     tab_aux = tab_aux->next;
                                 }
                                 if(flag_no_dest == 1)
+                                {
+                                    // isto não está especificado, mas se recebermos uma mensagem de interesse e não soubermos para quem a enviar
+                                    // enviamos um NODATA de volta
+                                    errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
+                                    if (errcode < 0)
+                                    {
+                                        fprintf(stderr, "error in NODATA TCP message creation: snprintf returned a negative value\n");
+                                        freeMessageList(&msg_list);
+                                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                    }
+                                    if (errcode >= 150)
+                                    {
+                                        fprintf(stderr, "error in NODATA TCP message creation: snprintf needed a bigger buffer\n");
+                                        freeMessageList(&msg_list);
+                                        leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
+                                        if (end)
+                                            safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
+                                    }
+                                    if (writeTCP(external->fd, strlen(message_buffer), message_buffer) == ERROR)
+                                    {
+                                        fprintf(stderr, "Error writing to external neighbour when we receive INTEREST from it. We shall close the connection now\n");
+                                        externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
+                                        freeMessageList(&msg_list);
+                                        break;
+                                    }
                                     deleteInterest(&first_interest, arg1, external->fd);
+                                }
                             }
                         }
                         free(id);
                     }
 
                     // para quando recebemos uma mensagem DATA do vizinho externo, iteramos a lista de pedidos
-                    if (!strcmp(command, "DATA") && word_count == 2)
+                    else if (!strcmp(command, "DATA") && word_count == 2)
                     {
                         interest_aux = first_interest;
                         interest_tmp = NULL;
@@ -568,7 +630,10 @@ int main(int argc, char *argv[])
                                 {
                                     n_obj++;
                                     if(saveinCache(cache, arg1, &n_obj, N) == END_EXECUTION)
+                                    {
+                                        freeMessageList(&msg_list);
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                    }
                                 }
                                 printf("Received DATA %s\n", interest_aux->obj);
                                 deleteInterest(&first_interest, arg1, interest_aux->fd);
@@ -583,7 +648,10 @@ int main(int argc, char *argv[])
                                 {
                                     n_obj++;
                                     if(saveinCache(cache, arg1, &n_obj, N) == END_EXECUTION)
+                                    {
+                                        freeMessageList(&msg_list);
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                    }
                                 }
                                 // reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
                                 if(writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message) == ERROR)
@@ -619,7 +687,7 @@ int main(int argc, char *argv[])
                     }
 
                     // para quando recebemos uma mensagem NODATA do vizinho externo, iteramos a lista de pedidos
-                    if (!strcmp(command, "NODATA") && word_count == 2)
+                    else if (!strcmp(command, "NODATA") && word_count == 2)
                     {	
                         interest_aux = first_interest;
                         interest_tmp = NULL;
@@ -671,6 +739,14 @@ int main(int argc, char *argv[])
                                 interest_aux = interest_aux->next;
                         }
                     }
+                    // neste caso recebemos uma mensagem completa e mal formatada. Vamos fechar a conexão
+                    else
+                    {
+                        printf("We received a poorly formatted complete message. We shall close the connection with the one who sent it\n");
+                        freeMessageList(&msg_list);
+                        externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
+                        break;
+                    }
 
                     msg_aux = msg_list;
                     msg_list = msg_list->next;
@@ -702,8 +778,17 @@ int main(int argc, char *argv[])
                     {
                         // adicionar aqui o argumento de lixo extra
                         word_count = sscanf(msg_list->message, "%s %s %s\n", command, arg1, arg2);
-                        // adicionar aqui a verificação do sscanf e errno e assim
-
+                        // neste sscanf como são mensagens que vêm de um vizinho optámos por não terminar o programa devido à ambiguidade da manpage.
+                        // notar que para ser mesmo robusto devíamos ver se o erro era por exemplo ENOMEM e nesse caso fechar o programa, etc..
+                        if (word_count == EOF)
+                            fprintf(stderr, "sscanf error:%s\n", strerror(errno));
+                        if (word_count < 2)
+                        {
+                            printf("Received a poorly formatted message from an internal neigbour. Closing connection with it\n");
+                            freeMessageList(&msg_list);
+                            internalLeft(&first_entry, &n_obj, cache, &external, backup, &neigh_aux, &neigh_tmp, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
+                            break;
+                        }
                         // este é o caso em que já tinhamos vizinho externo e recebemos
                         // um novo vizinho que fez connect para nos e enviou o NEW
                         if (!strcmp(command, "NEW") && word_count == 3)
@@ -711,11 +796,12 @@ int main(int argc, char *argv[])
                             printf("Just received our newly arrived internal's data\n");
                             strncpy(neigh_aux->this->IP, arg1, NI_MAXHOST);
                             strncpy(neigh_aux->this->port, arg2, NI_MAXSERV);
+                            neigh_aux->this->contact_filled = 1;
                         }
 
                         // para quando recebemos uma mensagem ADVERTISE de um interno, reencaminhar esta mensagem para os restantes internos (se houverem), bem como ao nosso externo
                         // no final deste processo adicionamos a entrada a nossa tabela de expedição
-                        if (!strcmp(command, "ADVERTISE") && word_count == 2)
+                        else if (!strcmp(command, "ADVERTISE") && word_count == 2)
                         {
                             if(checkTabEntry(first_entry, arg1) == 1)
                             {
@@ -752,13 +838,16 @@ int main(int argc, char *argv[])
                                     externalLeft(&first_entry, &n_obj, cache, &external, backup, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
                                 }
                                 if(createinsertTabEntry(&first_entry, arg1, neigh_aux->this->fd) == END_EXECUTION)
+                                {
+                                    freeMessageList(&msg_list);
                                     safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                }
                             }
                         }
 
                         // para quando recebemos uma mensagem WITHDRAW de um interno, reencaminhar esta mensagem para os outros internos (se houverem), bem como ao nosso externo
                         // no final deste processo eliminamos a respetiva entrada da tabela de expedição correspondente ao id do nó que saiu da rede
-                        if (!strcmp(command, "WITHDRAW") && word_count == 2)
+                        else if (!strcmp(command, "WITHDRAW") && word_count == 2)
                         {
                             neigh_tmp2 = NULL;
                             neigh_tmp1 = int_neighbours;
@@ -782,19 +871,28 @@ int main(int argc, char *argv[])
                             }
                             deleteTabEntryid(&first_entry, arg1);
                             if(deleteInterestWITHDRAW(&first_interest, arg1) == END_EXECUTION)
+                            {
+                                freeMessageList(&msg_list);
                                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                            }
 
                             if(deleteCacheid(cache, &n_obj, arg1) == END_EXECUTION)
+                            {
+                                freeMessageList(&msg_list);
                                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                            }
                         }
 
                         // para quando recebemos uma mensagem INTEREST dum vizinho interno
-                        if (!strcmp(command, "INTEREST") && word_count == 2)
+                        else if (!strcmp(command, "INTEREST") && word_count == 2)
                         {
                             id = NULL;
                             id = getidfromName(arg1, id);
                             if(id == NULL)
+                            {
+                                freeMessageList(&msg_list);
                                 safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                            }
 
                             // verificar primeiro se o identificador do objeto corresponde ao nosso (se somos o destino da mensagem de interesse)		
                             if(!strcmp(self.id, id))
@@ -807,12 +905,16 @@ int main(int argc, char *argv[])
                                     if (errcode < 0)
                                     {
                                         fprintf(stderr, "error in DATA TCP message creation: snprintf returned a negative value\n");
+                                        freeMessageList(&msg_list);
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                                     }
                                     if (errcode >= 150)
                                     {
                                         fprintf(stderr, "error in DATA TCP message creation: snprintf needed a bigger buffer\n");
-                                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                        freeMessageList(&msg_list);
+                                        leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
+                                        if (end)
+                                            safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                                     }
                                 }
                                 else
@@ -823,12 +925,16 @@ int main(int argc, char *argv[])
                                     if (errcode < 0)
                                     {
                                         fprintf(stderr, "error in NODATA TCP message creation: snprintf returned a negative value\n");
+                                        freeMessageList(&msg_list);
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                                     }
                                     if (errcode >= 150)
                                     {
                                         fprintf(stderr, "error in NODATA TCP message creation: snprintf needed a bigger buffer\n");
-                                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                        freeMessageList(&msg_list);
+                                        leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
+                                        if (end)
+                                            safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                                     }
                                 }
                                 if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
@@ -848,13 +954,17 @@ int main(int argc, char *argv[])
                                     errcode = snprintf(message_buffer, 150, "DATA %s\n", arg1);  
                                     if (errcode < 0)
                                     {
+                                        freeMessageList(&msg_list);
                                         fprintf(stderr, "error in DATA TCP message creation: snprintf returned a negative value\n");
                                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
                                     }
                                     if (errcode >= 150)
                                     {
                                         fprintf(stderr, "error in DATA TCP message creation: snprintf needed a bigger buffer\n");
-                                        safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                        freeMessageList(&msg_list);
+                                        leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
+                                        if (end)
+                                            safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
                                     }
                                     if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
                                     {
@@ -871,7 +981,10 @@ int main(int argc, char *argv[])
                                     if(checkInterest(first_interest, arg1, neigh_aux->this->fd) != 1)
                                     {
                                         if(addInterest(&first_interest, arg1, neigh_aux->this->fd) == END_EXECUTION)
+                                        {
+                                            freeMessageList(&msg_list);
                                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                        }
                                     }
                                     // se não tivermos o objeto na cache, não sendo nós o destino, reencaminhamos a mensagem INTEREST para o próximo nó através da tabela de expedição
                                     tab_aux = first_entry;
@@ -912,14 +1025,39 @@ int main(int argc, char *argv[])
                                         tab_aux = tab_aux->next;
                                     }
                                     if(flag_no_dest == 1)
+                                    {
+                                        errcode = snprintf(message_buffer, 150, "NODATA %s\n", arg1);  
+                                        if (errcode < 0)
+                                        {
+                                            fprintf(stderr, "error in NODATA TCP message creation: snprintf returned a negative value\n");
+                                            freeMessageList(&msg_list);
+                                            safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                        }
+                                        if (errcode >= 150)
+                                        {
+                                            fprintf(stderr, "error in NODATA TCP message creation: snprintf needed a bigger buffer\n");
+                                            freeMessageList(&msg_list);
+                                            leave(&flag_one_node, &we_are_reg, regIP, regUDP, &external, &int_neighbours, &self, &first_entry, &head, cache, &n_obj, &first_interest, &end);
+                                            if (end)
+                                                safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);  
+                                        }
+
+                                        if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                                        {
+                                            fprintf(stderr, "Error writing to internal neighbour when we receive INTEREST from it. We shall close the connection now\n");
+                                            internalLeft(&first_entry, &n_obj, cache, &external, backup, &neigh_aux, &neigh_tmp, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
+                                            freeMessageList(&msg_list);
+                                            break;	
+                                        }
                                         deleteInterest(&first_interest, arg1, neigh_aux->this->fd);
+                                    }
                                 }
                             }
                             free(id);
                         }
 
                         // para quando recebemos uma mensagem DATA do vizinho interno, iteramos a lista de pedidos
-                        if (!strcmp(command, "DATA") && word_count == 2)
+                        else if (!strcmp(command, "DATA") && word_count == 2)
                         {
                             interest_aux = first_interest;
                             interest_tmp = NULL;
@@ -936,7 +1074,10 @@ int main(int argc, char *argv[])
                                     {
                                         n_obj++;
                                         if(saveinCache(cache, arg1, &n_obj, N) == END_EXECUTION)
+                                        {
+                                            freeMessageList(&msg_list);
                                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                        }
                                     }
                                     printf("Received DATA %s\n", interest_aux->obj);
                                     deleteInterest(&first_interest, arg1, interest_aux->fd);
@@ -951,7 +1092,10 @@ int main(int argc, char *argv[])
                                     {
                                         n_obj++;
                                         if(saveinCache(cache, arg1, &n_obj, N) == END_EXECUTION)
+                                        {
+                                            freeMessageList(&msg_list);
                                             safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, NULL, EXIT_FAILURE);
+                                        }
                                     }
                                     // reencaminhamos a mensagem DATA para o vizinho que fez esse pedido
                                     if(writeTCP(interest_aux->fd, strlen(msg_list->message), msg_list->message) == ERROR)
@@ -995,7 +1139,7 @@ int main(int argc, char *argv[])
                         }
 
                         // para quando recebemos uma mensagem NODATA do vizinho interno, iteramos a lista de pedidos
-                        if (!strcmp(command, "NODATA") && word_count == 2)
+                        else if (!strcmp(command, "NODATA") && word_count == 2)
                         {
                             interest_aux = first_interest;
                             interest_tmp = NULL;
@@ -1054,6 +1198,13 @@ int main(int argc, char *argv[])
                                 else
                                     interest_aux = interest_aux->next;
                             }
+                        }
+                        else
+                        {
+                            printf("We received a poorly formatted message from an internal neighbour. We shall close the connection with it now\n");
+                            freeMessageList(&msg_list);
+                            internalLeft(&first_entry, &n_obj, cache, &external, backup, &neigh_aux, &neigh_tmp, &int_neighbours, &first_interest, &self, new, N, &head, regIP, regUDP, &flag_one_node, &we_are_reg);
+                            break;
                         }
                         msg_aux = msg_list;
                         msg_list = msg_list->next;
@@ -1212,6 +1363,7 @@ int main(int argc, char *argv[])
                         {
                             network_state = MANYNODES;                     
                             external_is_filled = 1;
+                            external->contact_filled = 1;
                         }
                         // verificar amanhã todas as condições de erro. Mas basicamente, se não houver erros
                         // nestas funções todas, temos de nos registar
@@ -1256,6 +1408,7 @@ int main(int argc, char *argv[])
                         safeExit(cache, N, &external, &backup, &new, &first_entry, &head, &first_interest, &self, regIP, regUDP, user_input, EXIT_FAILURE);
                 }
                 external_is_filled = 1;
+                external->contact_filled = 1;
                 // aqui crashamos o programa, porque sendo os 4 argumentos strings
                 // se falhar o sscanf provavelmente passa-se algo de muito mal.
                 if(sscanf(user_input,"%s %s %s %s", net, ident, external->IP, external->port ) != 4)
@@ -1520,10 +1673,16 @@ int main(int argc, char *argv[])
                     neigh_aux = int_neighbours;
                     while (neigh_aux)
                     {
-                        printf("Internal neighbour's contact: %s:%s\n", neigh_aux->this->IP, neigh_aux->this->port);
+                        if (neigh_aux->this->contact_filled)
+                            printf("Internal neighbour's contact: %s:%s\n", neigh_aux->this->IP, neigh_aux->this->port);
+                        else
+                            printf("We have an internal neighbour that hasn't advertised itself yet\n");
                         neigh_aux = neigh_aux->next;
                     }
-                    printf("External neighbour's contact: %s:%s\n", external->IP, external->port);
+                    if (external_is_filled)
+                        printf("External neighbour's contact: %s:%s\n", external->IP, external->port);
+                    else
+                        printf("Our external neighbour hasn't given us its contact yet\n");
                     printf("Backup's contact: %s:%s\n", backup->IP, backup->port);
                 }
                 else
@@ -1677,41 +1836,46 @@ void externalLeft(tab_entry **first_entry, int *n_obj, char **cache, viz **exter
             neigh_aux = *int_neighbours;
             *int_neighbours = (*int_neighbours)->next;     
             free(neigh_aux);
-            // enviar um EXTERN com os dados do vizinho interno promovido a vizinho externo
-            // para o notificar  
-            errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", (*external)->IP, (*external)->port);  
-            if (errcode < 0)
+            // pode ser que o nosso vizinho interno ainda não nos tenha enviado o NEW
+            // nesse caso, não podemos enviar mensagens com o seu contacto porque não o temos
+            if((*external)->contact_filled)
             {
-                fprintf(stderr, "error in EXTERN TCP message creation: snprintf returned a negative value\n");
-                safeExit(cache, N, external, &backup, &new, first_entry, head, first_interest, self, regIP, regUDP, NULL, EXIT_FAILURE);
-            }
-            if (errcode >= 150)
-            {
-                fprintf(stderr, "error in EXTERN TCP message creation: snprintf needed a bigger buffer\n");
-                leave(flag_one_node, we_are_reg, regIP, regUDP, external, int_neighbours, self, first_entry, head, cache, n_obj, first_interest, &end);
-                if (end)
-                    safeExit(cache, N, external, &backup, &new, first_entry, head, first_interest, self, regIP, regUDP, NULL, EXIT_FAILURE);
-                return;
-            }
-            if(writeTCP((*external)->fd, strlen(message_buffer), message_buffer) == ERROR)
-            {
-                fprintf(stderr, "Error writing EXTERN to external (old internal). We shall close the connection now\n");
-                externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self, new, N, head, regIP, regUDP, flag_one_node, we_are_reg);	
-                return; // a função externalLeft não foi preparada para ser chamada recursivamente e prosseguir execução
-            }   
-            // para todos os vizinhos internos que não foram promovidos a vizinhos externos, notificá-los também
-            // que têm um novo vizinho externo
-            neigh_tmp = NULL;
-            neigh_aux = *int_neighbours;
-            while (neigh_aux != NULL)
-            {
-                if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                // enviar um EXTERN com os dados do vizinho interno promovido a vizinho externo
+                // para o notificar  
+                errcode = snprintf(message_buffer, 150, "EXTERN %s %s\n", (*external)->IP, (*external)->port);  
+                if (errcode < 0)
                 {
-                    fprintf(stderr, "Error writing EXTERN to internal neighbour. We shall close the connection now\n");
-                    internalLeft(first_entry, n_obj, cache, external, backup, &neigh_aux, &neigh_tmp, int_neighbours, first_interest, self, new, N, head, regIP, regUDP, flag_one_node, we_are_reg);
+                    fprintf(stderr, "error in EXTERN TCP message creation: snprintf returned a negative value\n");
+                    safeExit(cache, N, external, &backup, &new, first_entry, head, first_interest, self, regIP, regUDP, NULL, EXIT_FAILURE);
                 }
-                neigh_tmp = neigh_aux;
-                neigh_aux = neigh_aux->next;
+                if (errcode >= 150)
+                {
+                    fprintf(stderr, "error in EXTERN TCP message creation: snprintf needed a bigger buffer\n");
+                    leave(flag_one_node, we_are_reg, regIP, regUDP, external, int_neighbours, self, first_entry, head, cache, n_obj, first_interest, &end);
+                    if (end)
+                        safeExit(cache, N, external, &backup, &new, first_entry, head, first_interest, self, regIP, regUDP, NULL, EXIT_FAILURE);
+                    return;
+                }
+                if(writeTCP((*external)->fd, strlen(message_buffer), message_buffer) == ERROR)
+                {
+                    fprintf(stderr, "Error writing EXTERN to external (old internal). We shall close the connection now\n");
+                    externalLeft(first_entry, n_obj, cache, external, backup, int_neighbours, first_interest, self, new, N, head, regIP, regUDP, flag_one_node, we_are_reg);	
+                    return; // a função externalLeft não foi preparada para ser chamada recursivamente e prosseguir execução
+                }   
+                // para todos os vizinhos internos que não foram promovidos a vizinhos externos, notificá-los também
+                // que têm um novo vizinho externo
+                neigh_tmp = NULL;
+                neigh_aux = *int_neighbours;
+                while (neigh_aux != NULL)
+                {
+                    if(writeTCP(neigh_aux->this->fd, strlen(message_buffer), message_buffer) == ERROR)
+                    {
+                        fprintf(stderr, "Error writing EXTERN to internal neighbour. We shall close the connection now\n");
+                        internalLeft(first_entry, n_obj, cache, external, backup, &neigh_aux, &neigh_tmp, int_neighbours, first_interest, self, new, N, head, regIP, regUDP, flag_one_node, we_are_reg);
+                    }
+                    neigh_tmp = neigh_aux;
+                    neigh_aux = neigh_aux->next;
+                }
             }
         }
         // caso fôssemos o nosso próprio backup e não tivéssemos vizinhos 
